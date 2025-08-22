@@ -62,6 +62,10 @@ func StopAllInstances() {
 
 func CleanOldHistory(db *Repository) {
 	ReadConfig()
+	if shouldClean := viper.GetBool("clean_up"); !shouldClean {
+		return
+	}
+
 	// ttl takes precedence over 'size limit' strategy
 	if ttl := viper.GetInt("ttl"); ttl > 0 {
 		db.DeleteOldest(ttl)

@@ -1,9 +1,9 @@
-## homey stop
+## homie stop
 
 Stop clipboard manager
 
 ```
-homey stop
+homie stop
 ```
 
 ### Options
@@ -14,5 +14,5 @@ homey stop
 
 ### SEE ALSO
 
-* [homey](homey.md)	 - Terminal-based clipboard manager
+* [homie](homie.md)	 - Terminal-based clipboard manager
 

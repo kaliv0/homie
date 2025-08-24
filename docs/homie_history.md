@@ -1,4 +1,4 @@
-## homey history
+## homie history
 
 List clipboard history
 
@@ -8,7 +8,7 @@ List clipboard history
   Use <tab> to pin and select multiple entries
 
 ```
-homey history [flags]
+homie history [flags]
 ```
 
 ### Options
@@ -21,5 +21,5 @@ homey history [flags]
 
 ### SEE ALSO
 
-* [homey](homey.md)	 - Terminal-based clipboard manager
+* [homie](homie.md)	 - Terminal-based clipboard manager
 

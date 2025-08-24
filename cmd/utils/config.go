@@ -10,7 +10,7 @@ import (
 var ReadConfig = sync.OnceFunc(readConfig)
 
 func readConfig() {
-	viper.SetConfigName(".homeyrc")
+	viper.SetConfigName(".homierc")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath("$HOME/")
 	if err := viper.ReadInConfig(); err != nil {

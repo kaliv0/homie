@@ -1,9 +1,9 @@
-## homey start
+## homie start
 
 Start clipboard manager
 
 ```
-homey start
+homie start
 ```
 
 ### Options
@@ -14,5 +14,5 @@ homey start
 
 ### SEE ALSO
 
-* [homey](homey.md)	 - Terminal-based clipboard manager
+* [homie](homie.md)	 - Terminal-based clipboard manager
 

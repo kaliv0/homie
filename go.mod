@@ -1,4 +1,4 @@
-module github.com/kaliv0/homey
+module github.com/kaliv0/homie
 
 go 1.24.4
 

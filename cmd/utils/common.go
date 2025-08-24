@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	Logger = log.New(os.Stderr, "Homey error: ", log.Llongfile)
+	Logger = log.New(os.Stderr, "Homie error: ", log.Llongfile)
 
 	GetDbPath = sync.OnceValue(func() string {
 		return getDbPath()
@@ -34,12 +34,12 @@ func getDbPath() string {
 		}
 		subDirsList = append(subDirsList, homeDir, ".config")
 	}
-	subDirsList = append(subDirsList, "homey")
+	subDirsList = append(subDirsList, "homie")
 	configDir := filepath.Join(subDirsList...)
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		Logger.Fatal(err)
 	}
-	return filepath.Join(configDir, "homey.db")
+	return filepath.Join(configDir, "homie.db")
 }
 
 func StopAllInstances() {
@@ -52,7 +52,7 @@ func StopAllInstances() {
 		if err != nil {
 			Logger.Fatal(err)
 		}
-		if pName == "homey" && int32(os.Getpid()) != p.Pid {
+		if pName == "homie" && int32(os.Getpid()) != p.Pid {
 			if err := p.Terminate(); err != nil {
 				Logger.Fatal(err)
 			}

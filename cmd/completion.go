@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/kaliv0/homey/cmd/utils"
+	"github.com/kaliv0/homie/cmd/utils"
 	"github.com/spf13/cobra"
 )
 

@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/kaliv0/homey/cmd/utils"
+	"github.com/kaliv0/homie/cmd/utils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"golang.design/x/clipboard"
@@ -19,7 +19,7 @@ var (
 			// read flags
 			utils.ReadConfig()
 			// limit is read in order:
-			//'--limit <n>' cli flag -> .homeyrc  -> Flags().IntP() default val
+			//'--limit <n>' cli flag -> .homierc  -> Flags().IntP() default val
 			limit := viper.GetInt("limit")
 			shouldPaste, err := cmd.Flags().GetBool("paste")
 			if err != nil {

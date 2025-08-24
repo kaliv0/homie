@@ -1,14 +1,14 @@
-## homey shell
+## homie shell
 
 Generate a shell integration script
 
 ### Synopsis
 
 To enable shell integration execute:
-$ source <(homey shell | tee -a "$HOME/.bashrc")
+$ source <(homie shell | tee -a "$HOME/.bashrc")
 
 ```
-homey shell
+homie shell
 ```
 
 ### Options
@@ -19,5 +19,5 @@ homey shell
 
 ### SEE ALSO
 
-* [homey](homey.md)	 - Terminal-based clipboard manager
+* [homie](homie.md)	 - Terminal-based clipboard manager
 

@@ -1,20 +1,20 @@
-###  Homey config  ###
-homey start
+###  Homie config  ###
+homie start
 
-__homey_history()
+__homie_history()
 {
     local output
-    output=$(homey history "$@")
+    output=$(homie history "$@")
     READLINE_LINE="${READLINE_LINE}${output}"
     READLINE_POINT=${#READLINE_LINE}
 }
 
 # Uncomment next line and define limit
-#HOMEY_LIMIT=<limit>
-if [[ $HOMEY_LIMIT ]]; then
-    bind -x '"\C-h": __homey_history --limit "${HOMEY_LIMIT}"'
-    bind -x '"\C-p": __homey_history --paste --limit "${HOMEY_LIMIT}"'
+#HOMIE_LIMIT=<limit>
+if [[ $HOMIE_LIMIT ]]; then
+    bind -x '"\C-h": __homie_history --limit "${HOMIE_LIMIT}"'
+    bind -x '"\C-p": __homie_history --paste --limit "${HOMIE_LIMIT}"'
 else
-    bind -x '"\C-h": __homey_history'
-    bind -x '"\C-p": __homey_history --paste'
+    bind -x '"\C-h": __homie_history'
+    bind -x '"\C-p": __homie_history --paste'
 fi

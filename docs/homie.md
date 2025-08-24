@@ -1,4 +1,4 @@
-## homey
+## homie
 
 Terminal-based clipboard manager
 
@@ -35,15 +35,15 @@ Terminal-based clipboard manager
 ### Options
 
 ```
-  -h, --help   help for homey
+  -h, --help   help for homie
 ```
 
 ### SEE ALSO
 
-* [homey clear](homey_clear.md)	 - Clear clipboard history
-* [homey completion](homey_completion.md)	 - Generate completion script
-* [homey history](homey_history.md)	 - List clipboard history
-* [homey shell](homey_shell.md)	 - Generate a shell integration script
-* [homey start](homey_start.md)	 - Start clipboard manager
-* [homey stop](homey_stop.md)	 - Stop clipboard manager
+* [homie clear](homie_clear.md)	 - Clear clipboard history
+* [homie completion](homie_completion.md)	 - Generate completion script
+* [homie history](homie_history.md)	 - List clipboard history
+* [homie shell](homie_shell.md)	 - Generate a shell integration script
+* [homie start](homie_start.md)	 - Start clipboard manager
+* [homie stop](homie_stop.md)	 - Stop clipboard manager
 

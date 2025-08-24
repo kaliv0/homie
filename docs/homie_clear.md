@@ -1,9 +1,9 @@
-## homey clear
+## homie clear
 
 Clear clipboard history
 
 ```
-homey clear
+homie clear
 ```
 
 ### Options
@@ -14,5 +14,5 @@ homey clear
 
 ### SEE ALSO
 
-* [homey](homey.md)	 - Terminal-based clipboard manager
+* [homie](homie.md)	 - Terminal-based clipboard manager
 

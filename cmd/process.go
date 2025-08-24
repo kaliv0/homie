@@ -3,7 +3,7 @@ package cmd
 import (
 	"os/exec"
 
-	"github.com/kaliv0/homey/cmd/utils"
+	"github.com/kaliv0/homie/cmd/utils"
 	"github.com/spf13/cobra"
 )
 

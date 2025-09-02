@@ -111,8 +111,6 @@ func TrackClipboard(db *Repository) {
 	}
 
 	// shut down gracefully long-running task
-	select {
-	case <-ctx.Done():
-		db.Close()
-	}
+	<-ctx.Done()
+	db.Close()
 }

@@ -1,19 +1,16 @@
-package storage
+package internal
 
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
-	"os"
 	"time"
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
 	"github.com/spf13/viper"
-
-	"github.com/kaliv0/homie/internal/config"
-	"github.com/kaliv0/homie/internal/runtime"
 )
 
 // ClipboardItem represents a clipboard entry persisted in the database.
@@ -30,28 +27,26 @@ type Repository struct {
 }
 
 // NewRepository opens (and optionally migrates) the SQLite database at dbPath.
-func NewRepository(dbPath string, shouldMigrate bool) *Repository {
+func NewRepository(dbPath string, shouldMigrate bool) (*Repository, error) {
 	// create db if not exists
 	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
 	if err != nil {
-		runtime.Logger.Fatal(err)
+		return nil, fmt.Errorf("open database: %w", err)
 	}
 
 	r := &Repository{db}
 	if shouldMigrate {
 		if migrateErr := r.db.AutoMigrate(&ClipboardItem{}); migrateErr != nil {
-			runtime.Logger.Print(migrateErr)
-
 			sqlDB, sqlErr := db.DB()
 			if sqlErr != nil {
-				runtime.Logger.Print(sqlErr)
-			} else if closeErr := sqlDB.Close(); closeErr != nil {
-				runtime.Logger.Print(closeErr)
+				return nil, fmt.Errorf("auto migrate: %w", migrateErr)
 			}
-			os.Exit(1)
+			if dbCloseErr := sqlDB.Close(); dbCloseErr != nil {
+				return nil, fmt.Errorf("close database: %w", dbCloseErr)
+			}
 		}
 	}
-	return r
+	return r, nil
 }
 
 func (r *Repository) Read(offset, limit int) []ClipboardItem {
@@ -63,7 +58,7 @@ func (r *Repository) Read(offset, limit int) []ClipboardItem {
 		Find(&items)
 	if result.Error != nil {
 		r.Close()
-		runtime.Logger.Fatal(result.Error)
+		Logger.Fatal(result.Error)
 	}
 	return items
 }
@@ -76,9 +71,9 @@ func (r *Repository) Write(item []byte) {
 
 	var existingItem = ClipboardItem{}
 	result := r.db.Where(&ClipboardItem{TextHash: textHash}).First(&existingItem)
-	if result.Error != nil && result.Error.Error() != "record not found" {
+	if result.Error != nil && !errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		r.Close()
-		runtime.Logger.Fatal(result.Error)
+		Logger.Fatal(result.Error)
 	}
 
 	if result.RowsAffected > 0 {
@@ -86,7 +81,7 @@ func (r *Repository) Write(item []byte) {
 		result := r.db.Save(&existingItem)
 		if result.Error != nil {
 			r.Close()
-			runtime.Logger.Fatal(result.Error)
+			Logger.Fatal(result.Error)
 		}
 	} else {
 		result := r.db.Create(&ClipboardItem{
@@ -96,28 +91,28 @@ func (r *Repository) Write(item []byte) {
 		})
 		if result.Error != nil {
 			r.Close()
-			runtime.Logger.Fatal(result.Error)
+			Logger.Fatal(result.Error)
 		}
 	}
 }
 
 func (r *Repository) DeleteExcess(deleteCount int) {
 	// DeleteExcess removes the oldest records by count.
-	result := r.db.Exec(`DELETE FROM clipboard_items WHERE id IN 
+	result := r.db.Exec(`DELETE FROM clipboard_items WHERE id IN
 					  (SELECT id FROM clipboard_items ORDER BY time_stamp ASC LIMIT ?)`, deleteCount)
 	if result.Error != nil {
 		r.Close()
-		runtime.Logger.Fatal(result.Error)
+		Logger.Fatal(result.Error)
 	}
 }
 
 func (r *Repository) DeleteOldest(ttl int) {
 	// DeleteOldest removes records older than the given TTL (days).
-	result := r.db.Exec(`DELETE FROM clipboard_items 
-       					WHERE time_stamp < datetime('now', concat(?, ' days'), 'localtime') `, fmt.Sprintf("-%d", ttl))
+	result := r.db.Exec(`DELETE FROM clipboard_items
+       					WHERE time_stamp < datetime('now', ? || ' days', 'localtime')`, fmt.Sprintf("-%d", ttl))
 	if result.Error != nil {
 		r.Close()
-		runtime.Logger.Fatal(result.Error)
+		Logger.Fatal(result.Error)
 	}
 }
 
@@ -127,7 +122,7 @@ func (r *Repository) Count() int {
 	result := r.db.Model(&ClipboardItem{}).Count(&count)
 	if result.Error != nil {
 		r.Close()
-		runtime.Logger.Fatal(result.Error)
+		Logger.Fatal(result.Error)
 	}
 	return int(count)
 }
@@ -137,7 +132,7 @@ func (r *Repository) Reset() {
 	result := r.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&ClipboardItem{})
 	if result.Error != nil {
 		r.Close()
-		runtime.Logger.Fatal(result.Error)
+		Logger.Fatal(result.Error)
 	}
 }
 
@@ -146,16 +141,17 @@ func (r *Repository) Close() {
 	// get generic db object sql.DB to use its functions
 	sqlDB, err := r.db.DB()
 	if err != nil {
-		runtime.Logger.Fatal(err)
+		Logger.Print(err)
+		return
 	}
 	if err = sqlDB.Close(); err != nil {
-		runtime.Logger.Fatal(err)
+		Logger.Print(err)
 	}
 }
 
 // CleanOldHistory trims clipboard history based on ttl or max_size settings.
 func CleanOldHistory(db *Repository) {
-	config.ReadConfig()
+	ReadConfig()
 	if shouldClean := viper.GetBool("clean_up"); !shouldClean {
 		return
 	}

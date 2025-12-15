@@ -1,4 +1,4 @@
-package runtime
+package internal
 
 import (
 	"log"
@@ -19,11 +19,11 @@ func StopAllInstances() {
 	for _, p := range processes {
 		pName, err := p.Name()
 		if err != nil {
-			Logger.Fatal(err)
+			continue // Skip inaccessible processes
 		}
 		if pName == "homie" && int32(os.Getpid()) != p.Pid {
 			if err := p.Terminate(); err != nil {
-				Logger.Fatal(err)
+				Logger.Print(err) // Log but continue trying other instances
 			}
 		}
 	}

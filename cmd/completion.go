@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/kaliv0/homie/cmd/utils"
 	"github.com/spf13/cobra"
+
+	"github.com/kaliv0/homie/internal"
 )
 
 var (
@@ -16,9 +17,8 @@ var (
 $ source <(%s completion | tee -a "$HOME/.bash_completion")`, rootCmd.Root().Name()),
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, _ []string) {
-			err := cmd.Root().GenBashCompletion(os.Stdout)
-			if err != nil {
-				utils.Logger.Fatal(err)
+			if err := cmd.Root().GenBashCompletion(os.Stdout); err != nil {
+				internal.Logger.Fatal(err)
 			}
 		},
 	}

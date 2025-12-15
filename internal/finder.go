@@ -1,6 +1,7 @@
-package utils
+package internal
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -10,20 +11,24 @@ import (
 
 var mu sync.RWMutex
 
+// ListHistory loads clipboard history, presents a fuzzy finder, and returns selected text.
 func ListHistory(dbPath string, limit int) string {
 	// load history
 	db := NewRepository(dbPath, false)
-	defer func() {
-		db.Close()
-	}()
+	defer db.Close()
 
+	// display & search
 	offset := 0
 	history := db.Read(offset, limit)
 	total := db.Count()
-	// display & search
 	loadMore := handleLoadChannel(&history, db, offset, limit, total)
 	idxs := findItemIdxs(&history, loadMore)
+
 	// return selected item (from preview window)
+	if len(idxs) == 0 {
+		return ""
+	}
+
 	var out []string
 	for _, i := range idxs {
 		out = append(out, history[i].ClipText)
@@ -62,7 +67,7 @@ func findItemIdxs(history *[]ClipboardItem, loadMore chan struct{}) []int {
 		fuzzyfinder.WithPreviewWindow(func(i, width, height int) string {
 			if i == -1 {
 				// no item found while searching
-				loadMore <- struct{}{} // NB: size 0 instead of 1 byte for bool e.g.
+				loadMore <- struct{}{}
 				return ""
 			}
 			// return string to display in previewWindow
@@ -71,7 +76,7 @@ func findItemIdxs(history *[]ClipboardItem, loadMore chan struct{}) []int {
 		// reloads passed history slice automatically when items appended
 		fuzzyfinder.WithHotReloadLock(mu.RLocker()),
 	)
-	if err != nil && err.Error() != "abort" {
+	if err != nil && !errors.Is(err, fuzzyfinder.ErrAbort) {
 		Logger.Fatal(err)
 	}
 	return idxs

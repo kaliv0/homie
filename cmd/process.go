@@ -3,8 +3,9 @@ package cmd
 import (
 	"os/exec"
 
-	"github.com/kaliv0/homie/cmd/utils"
 	"github.com/spf13/cobra"
+
+	"github.com/kaliv0/homie/internal"
 )
 
 var (
@@ -13,9 +14,9 @@ var (
 		Short:                 "Start clipboard manager",
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, _ []string) {
-			utils.StopAllInstances()
+			internal.StopAllInstances()
 			if err := exec.Command(cmd.Root().Name(), "run").Start(); err != nil {
-				utils.Logger.Fatal(err)
+				internal.Logger.Fatal(err)
 			}
 		},
 	}
@@ -24,10 +25,10 @@ var (
 		Use:    "run",
 		Hidden: true,
 		Run: func(cmd *cobra.Command, _ []string) {
-			dbPath := utils.GetDbPath()
-			db := utils.NewRepository(dbPath, true)
-			utils.CleanOldHistory(db)
-			utils.TrackClipboard(db)
+			dbPath := internal.DBPath()
+			db := internal.NewRepository(dbPath, true)
+			internal.CleanOldHistory(db)
+			internal.TrackClipboard(db)
 		},
 	}
 
@@ -36,7 +37,7 @@ var (
 		Short:                 "Stop clipboard manager",
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, _ []string) {
-			utils.StopAllInstances()
+			internal.StopAllInstances()
 		},
 	}
 )

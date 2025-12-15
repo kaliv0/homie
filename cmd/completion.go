@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/kaliv0/homie/cmd/utils"
+	"github.com/kaliv0/homie/internal/runtime"
 	"github.com/spf13/cobra"
 )
 
@@ -18,7 +18,7 @@ $ source <(%s completion | tee -a "$HOME/.bash_completion")`, rootCmd.Root().Nam
 		Run: func(cmd *cobra.Command, _ []string) {
 			err := cmd.Root().GenBashCompletion(os.Stdout)
 			if err != nil {
-				utils.Logger.Fatal(err)
+				runtime.Logger.Fatal(err)
 			}
 		},
 	}

@@ -3,7 +3,10 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/kaliv0/homie/cmd/utils"
+	"github.com/kaliv0/homie/internal/config"
+	"github.com/kaliv0/homie/internal/finder"
+	"github.com/kaliv0/homie/internal/runtime"
+	"github.com/kaliv0/homie/internal/storage"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"golang.design/x/clipboard"
@@ -17,18 +20,18 @@ var (
   Use <tab> to pin and select multiple entries`,
 		Run: func(cmd *cobra.Command, _ []string) {
 			// read flags
-			utils.ReadConfig()
+			config.ReadConfig()
 			// limit is read in order:
 			//'--limit <n>' cli flag -> .homierc  -> Flags().IntP() default val
 			limit := viper.GetInt("limit")
 			shouldPaste, err := cmd.Flags().GetBool("paste")
 			if err != nil {
-				utils.Logger.Fatal(err)
+				runtime.Logger.Fatal(err)
 			}
 
 			// fetch history-to-be-displayed
-			dbPath := utils.GetDbPath()
-			output := utils.ListHistory(dbPath, limit)
+			dbPath := config.DBPath()
+			output := finder.ListHistory(dbPath, limit)
 
 			// put output inside clipboard
 			clipboard.Write(clipboard.FmtText, []byte(output))
@@ -45,8 +48,8 @@ var (
 		Short:                 "Clear clipboard history",
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, _ []string) {
-			dbPath := utils.GetDbPath()
-			db := utils.NewRepository(dbPath, false)
+			dbPath := config.DBPath()
+			db := storage.NewRepository(dbPath, false)
 			defer func() {
 				db.Close()
 			}()
@@ -69,7 +72,7 @@ func init() {
 		"Paste selected history item",
 	)
 	if err := viper.BindPFlag("limit", listHistoryCmd.Flags().Lookup("limit")); err != nil {
-		utils.Logger.Fatal(err)
+		runtime.Logger.Fatal(err)
 	}
 	rootCmd.AddCommand(listHistoryCmd)
 	rootCmd.AddCommand(clearHistoryCmd)

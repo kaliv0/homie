@@ -1,4 +1,4 @@
-package utils
+package finder
 
 import (
 	"fmt"
@@ -6,13 +6,17 @@ import (
 	"sync"
 
 	"github.com/ktr0731/go-fuzzyfinder"
+
+	"github.com/kaliv0/homie/internal/runtime"
+	"github.com/kaliv0/homie/internal/storage"
 )
 
 var mu sync.RWMutex
 
+// ListHistory loads clipboard history, presents a fuzzy finder, and returns selected text.
 func ListHistory(dbPath string, limit int) string {
 	// load history
-	db := NewRepository(dbPath, false)
+	db := storage.NewRepository(dbPath, false)
 	defer func() {
 		db.Close()
 	}()
@@ -31,10 +35,10 @@ func ListHistory(dbPath string, limit int) string {
 	return strings.Join(out, " ")
 }
 
-func handleLoadChannel(history *[]ClipboardItem, db *Repository, offset, limit, total int) chan struct{} {
+func handleLoadChannel(history *[]storage.ClipboardItem, db *storage.Repository, offset, limit, total int) chan struct{} {
 	// signal more items needed -> triggered from fuzzyfinder.WithPreviewWindow
 	loadMore := make(chan struct{}, 1)
-	go func(history *[]ClipboardItem) {
+	go func(history *[]storage.ClipboardItem) {
 		for range loadMore {
 			if offset < total {
 				offset += limit
@@ -50,7 +54,7 @@ func handleLoadChannel(history *[]ClipboardItem, db *Repository, offset, limit, 
 	return loadMore
 }
 
-func findItemIdxs(history *[]ClipboardItem, loadMore chan struct{}) []int {
+func findItemIdxs(history *[]storage.ClipboardItem, loadMore chan struct{}) []int {
 	defer close(loadMore)
 	idxs, err := fuzzyfinder.FindMulti(
 		history,
@@ -72,7 +76,7 @@ func findItemIdxs(history *[]ClipboardItem, loadMore chan struct{}) []int {
 		fuzzyfinder.WithHotReloadLock(mu.RLocker()),
 	)
 	if err != nil && err.Error() != "abort" {
-		Logger.Fatal(err)
+		runtime.Logger.Fatal(err)
 	}
 	return idxs
 }

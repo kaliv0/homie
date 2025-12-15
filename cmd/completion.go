@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/kaliv0/homie/internal"
 	"github.com/spf13/cobra"
+
+	"github.com/kaliv0/homie/internal"
 )
 
 var (

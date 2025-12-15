@@ -14,22 +14,21 @@ var mu sync.RWMutex
 // ListHistory loads clipboard history, presents a fuzzy finder, and returns selected text.
 func ListHistory(dbPath string, limit int) string {
 	// load history
-	db, err := NewRepository(dbPath, false)
-	if err != nil {
-		Logger.Fatal(err)
-	}
+	db := NewRepository(dbPath, false)
+	defer db.Close()
 
-	defer func() {
-		db.Close()
-	}()
-
+	// display & search
 	offset := 0
 	history := db.Read(offset, limit)
 	total := db.Count()
-	// display & search
 	loadMore := handleLoadChannel(&history, db, offset, limit, total)
 	idxs := findItemIdxs(&history, loadMore)
+
 	// return selected item (from preview window)
+	if len(idxs) == 0 {
+		return ""
+	}
+
 	var out []string
 	for _, i := range idxs {
 		out = append(out, history[i].ClipText)

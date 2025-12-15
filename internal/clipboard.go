@@ -15,13 +15,11 @@ func TrackClipboard(db *Repository) {
 		Logger.Fatal(err)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	defer signal.Stop(sigChan)
 
+	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
 		<-sigChan
 		cancel()

@@ -13,6 +13,11 @@ import (
 	"github.com/spf13/viper"
 )
 
+const (
+	DefaultLimit   = 20
+	DefaultMaxSize = 500
+)
+
 // ClipboardItem represents a clipboard entry persisted in the database.
 type ClipboardItem struct {
 	ID        uint `gorm:"primaryKey"`
@@ -27,30 +32,28 @@ type Repository struct {
 }
 
 // NewRepository opens (and optionally migrates) the SQLite database at dbPath.
-func NewRepository(dbPath string, shouldMigrate bool) (*Repository, error) {
+func NewRepository(dbPath string, shouldMigrate bool) *Repository {
 	// create db if not exists
 	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
 	if err != nil {
-		return nil, fmt.Errorf("open database: %w", err)
+		Logger.Fatal(err)
 	}
 
 	r := &Repository{db}
 	if shouldMigrate {
-		if migrateErr := r.db.AutoMigrate(&ClipboardItem{}); migrateErr != nil {
-			sqlDB, sqlErr := db.DB()
-			if sqlErr != nil {
-				return nil, fmt.Errorf("auto migrate: %w", migrateErr)
+		if err = r.db.AutoMigrate(&ClipboardItem{}); err != nil {
+			// best-effort close on migration failure, ignore close errors
+			if sqlDB, sqlErr := db.DB(); sqlErr == nil {
+				_ = sqlDB.Close()
 			}
-			if dbCloseErr := sqlDB.Close(); dbCloseErr != nil {
-				return nil, fmt.Errorf("close database: %w", dbCloseErr)
-			}
+			Logger.Fatal(err)
 		}
 	}
-	return r, nil
+	return r
 }
 
+// Read returns clipboard items ordered by timestamp descending with pagination.
 func (r *Repository) Read(offset, limit int) []ClipboardItem {
-	// Read returns clipboard items ordered by timestamp descending with pagination.
 	var items []ClipboardItem
 	result := r.db.Order("time_stamp desc").
 		Offset(offset).
@@ -63,8 +66,8 @@ func (r *Repository) Read(offset, limit int) []ClipboardItem {
 	return items
 }
 
+// Write inserts a new clipboard item or bumps timestamp if the text already exists.
 func (r *Repository) Write(item []byte) {
-	// Write inserts a new clipboard item or bumps timestamp if the text already exists.
 	hasher := sha256.New()
 	hasher.Write(item)
 	textHash := hex.EncodeToString(hasher.Sum(nil))
@@ -96,18 +99,18 @@ func (r *Repository) Write(item []byte) {
 	}
 }
 
+// DeleteExcess removes the oldest records by count.
 func (r *Repository) DeleteExcess(deleteCount int) {
-	// DeleteExcess removes the oldest records by count.
 	result := r.db.Exec(`DELETE FROM clipboard_items WHERE id IN
-					  (SELECT id FROM clipboard_items ORDER BY time_stamp ASC LIMIT ?)`, deleteCount)
+					  (SELECT id FROM clipboard_items ORDER BY time_stamp LIMIT ?)`, deleteCount)
 	if result.Error != nil {
 		r.Close()
 		Logger.Fatal(result.Error)
 	}
 }
 
+// DeleteOldest removes records older than the given TTL (days).
 func (r *Repository) DeleteOldest(ttl int) {
-	// DeleteOldest removes records older than the given TTL (days).
 	result := r.db.Exec(`DELETE FROM clipboard_items
        					WHERE time_stamp < datetime('now', ? || ' days', 'localtime')`, fmt.Sprintf("-%d", ttl))
 	if result.Error != nil {
@@ -116,8 +119,8 @@ func (r *Repository) DeleteOldest(ttl int) {
 	}
 }
 
+// Count returns the total number of clipboard records.
 func (r *Repository) Count() int {
-	// Count returns the total number of clipboard records.
 	var count int64
 	result := r.db.Model(&ClipboardItem{}).Count(&count)
 	if result.Error != nil {
@@ -127,8 +130,8 @@ func (r *Repository) Count() int {
 	return int(count)
 }
 
+// Reset deletes all clipboard records.
 func (r *Repository) Reset() {
-	// Reset deletes all clipboard records.
 	result := r.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&ClipboardItem{})
 	if result.Error != nil {
 		r.Close()
@@ -136,8 +139,8 @@ func (r *Repository) Reset() {
 	}
 }
 
+// Close releases the underlying database connection.
 func (r *Repository) Close() {
-	// Close releases the underlying database connection.
 	// get generic db object sql.DB to use its functions
 	sqlDB, err := r.db.DB()
 	if err != nil {
@@ -163,15 +166,22 @@ func CleanOldHistory(db *Repository) {
 	}
 
 	maxSize := viper.GetInt("max_size")
-	if maxSize == 0 {
-		maxSize = 500
+	if maxSize <= 0 {
+		maxSize = DefaultMaxSize
 	}
+
 	minLimit := viper.GetInt("limit")
-	total := db.Count()
-	if total > maxSize {
-		if minLimit == 0 {
-			minLimit = 30
+	if minLimit <= 0 {
+		minLimit = DefaultLimit
+	}
+
+	if total := db.Count(); total > maxSize {
+		if minLimit >= total {
+			return
 		}
-		db.DeleteExcess(total - minLimit)
+
+		if deleteCount := total - minLimit; deleteCount > 0 {
+			db.DeleteExcess(deleteCount)
+		}
 	}
 }

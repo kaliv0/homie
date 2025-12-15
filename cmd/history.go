@@ -3,10 +3,11 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/kaliv0/homie/internal"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"golang.design/x/clipboard"
+
+	"github.com/kaliv0/homie/internal"
 )
 
 var (
@@ -21,6 +22,10 @@ var (
 			// limit is read in order:
 			//'--limit <n>' cli flag -> .homierc  -> Flags().IntP() default val
 			limit := viper.GetInt("limit")
+			if limit <= 0 {
+				limit = internal.DefaultLimit
+			}
+
 			shouldPaste, err := cmd.Flags().GetBool("paste")
 			if err != nil {
 				internal.Logger.Fatal(err)
@@ -29,7 +34,9 @@ var (
 			// fetch history-to-be-displayed
 			dbPath := internal.DBPath()
 			output := internal.ListHistory(dbPath, limit)
-
+			if len(output) == 0 {
+				return
+			}
 			// put output inside clipboard
 			clipboard.Write(clipboard.FmtText, []byte(output))
 			if shouldPaste {
@@ -46,10 +53,7 @@ var (
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, _ []string) {
 			dbPath := internal.DBPath()
-			db, err := internal.NewRepository(dbPath, false)
-			if err != nil {
-				internal.Logger.Fatal(err)
-			}
+			db := internal.NewRepository(dbPath, false)
 			defer func() {
 				db.Close()
 			}()
@@ -62,7 +66,7 @@ func init() {
 	listHistoryCmd.Flags().IntP(
 		"limit",
 		"l",
-		20,
+		internal.DefaultLimit,
 		"Limit the number of clipboard history items displayed",
 	)
 	listHistoryCmd.Flags().BoolP(

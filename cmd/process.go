@@ -3,8 +3,9 @@ package cmd
 import (
 	"os/exec"
 
-	"github.com/kaliv0/homie/internal"
 	"github.com/spf13/cobra"
+
+	"github.com/kaliv0/homie/internal"
 )
 
 var (
@@ -25,10 +26,7 @@ var (
 		Hidden: true,
 		Run: func(cmd *cobra.Command, _ []string) {
 			dbPath := internal.DBPath()
-			db, err := internal.NewRepository(dbPath, true)
-			if err != nil {
-				internal.Logger.Fatal(err)
-			}
+			db := internal.NewRepository(dbPath, true)
 			internal.CleanOldHistory(db)
 			internal.TrackClipboard(db)
 		},

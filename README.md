@@ -14,7 +14,7 @@ Supports <i>fuzzy search</i>, <i>multi-select</i> and other adorable <i>chicaner
 
 ## Installation
 
-```bash
+```shell
 $ go install github.com/kaliv0/homie@latest
 ```
 
@@ -22,14 +22,14 @@ $ go install github.com/kaliv0/homie@latest
 
 ## Usage
 
-```go
+```shell
 $ homie start
 ```
 
 Runs <i>homie</i> in a daemon process to track your clipboard.<br>
 It stores all copied items in a sqlite3 `homie.db` file under <i>\$XDG_CONFIG_HOME/</i> or <i>\$HOME/.config/</i> path.
 
-```go
+```shell
 $ homie stop
 ```
 
@@ -37,7 +37,7 @@ Stop the daemon process. You will be able to open the <i>history window</i>,<br>
 search and select (and of course - paste) items from it,
 but <i>homie</i> won't track any new changes in the clipboard.
 
-```go
+```shell
 $ homie history
 ```
 
@@ -51,7 +51,7 @@ After selecting an record and closing the window, <i>homie</i> puts the text ins
 (NB: You can select multiple items by pinning them with the <i>tab</i> key. They will be added to your clipboard buffer as a single string separted by spaces.)<br>
 To paste the text directly in your terminal run the `history` command with <i>--paste</i>.<br>
 
-```go
+```shell
 $ homie clear
 ```
 
@@ -61,14 +61,14 @@ Deletes all items from the `homie.db` store
 
 ## External configuration
 
-```go
+```shell
 $ homie shell
 ```
 
 Generates a shell configuration for your `.bashrc` that will start tha application automatically<br>
 as well add extra key bindings for opening the preview window.
 
-```go
+```shell
 $ homie completion
 ```
 

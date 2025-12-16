@@ -1,4 +1,4 @@
-package internal
+package storage
 
 import (
 	"crypto/sha256"
@@ -11,6 +11,9 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/spf13/viper"
+
+	"github.com/kaliv0/homie/internal/config"
+	"github.com/kaliv0/homie/internal/runtime"
 )
 
 const (
@@ -80,12 +83,12 @@ func (r *Repository) Write(item []byte) error {
 
 	if result.RowsAffected > 0 {
 		existingItem.TimeStamp = time.Now()
-		result := r.db.Save(&existingItem)
+		result = r.db.Save(&existingItem)
 		if result.Error != nil {
 			return result.Error
 		}
 	} else {
-		result := r.db.Create(&ClipboardItem{
+		result = r.db.Create(&ClipboardItem{
 			ClipText:  string(item),
 			TextHash:  textHash,
 			TimeStamp: time.Now(),
@@ -148,8 +151,8 @@ func (r *Repository) Close() error {
 
 // CleanOldHistory trims clipboard history based on ttl or max_size settings.
 func CleanOldHistory(db *Repository) error {
-	if err := ReadConfig(); err != nil {
-		Logger.Print(err)
+	if err := config.ReadConfig(); err != nil {
+		runtime.Logger.Print(err)
 	}
 	if shouldClean := viper.GetBool("clean_up"); !shouldClean {
 		return nil

@@ -1,4 +1,4 @@
-package internal
+package finder
 
 import (
 	"context"
@@ -8,6 +8,9 @@ import (
 	"sync"
 
 	"github.com/ktr0731/go-fuzzyfinder"
+
+	"github.com/kaliv0/homie/internal/runtime"
+	"github.com/kaliv0/homie/internal/storage"
 )
 
 var mu sync.RWMutex
@@ -15,14 +18,14 @@ var mu sync.RWMutex
 // ListHistory loads clipboard history and presents a fuzzy finder.
 func ListHistory(dbPath string, limit int) (string, error) {
 	// load history
-	db, err := NewRepository(dbPath, false)
+	db, err := storage.NewRepository(dbPath, false)
 	if err != nil {
 		return "", err
 	}
 
 	defer func() {
 		if closeErr := db.Close(); closeErr != nil {
-			Logger.Print(closeErr)
+			runtime.Logger.Print(closeErr)
 		}
 	}()
 
@@ -58,7 +61,7 @@ func ListHistory(dbPath string, limit int) (string, error) {
 	return strings.Join(out, " "), nil
 }
 
-func handleLoadChannel(ctx context.Context, history *[]ClipboardItem, db *Repository, offset, limit, total int) chan struct{} {
+func handleLoadChannel(ctx context.Context, history *[]storage.ClipboardItem, db *storage.Repository, offset, limit, total int) chan struct{} {
 	// signal more items needed -> triggered from fuzzyfinder.WithPreviewWindow
 	loadMore := make(chan struct{}, 1)
 	go func() {
@@ -73,7 +76,7 @@ func handleLoadChannel(ctx context.Context, history *[]ClipboardItem, db *Reposi
 					currentOffset += limit
 					page, err := db.Read(currentOffset, limit)
 					if err != nil {
-						Logger.Print(err)
+						runtime.Logger.Print(err)
 						continue
 					}
 					if len(page) > 0 {
@@ -90,7 +93,7 @@ func handleLoadChannel(ctx context.Context, history *[]ClipboardItem, db *Reposi
 	return loadMore
 }
 
-func findItemIdxs(history *[]ClipboardItem, loadMore chan struct{}) ([]int, error) {
+func findItemIdxs(history *[]storage.ClipboardItem, loadMore chan struct{}) ([]int, error) {
 	defer close(loadMore)
 	idxs, err := fuzzyfinder.FindMulti(
 		history,

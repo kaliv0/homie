@@ -7,7 +7,10 @@ import (
 	"github.com/spf13/viper"
 	"golang.design/x/clipboard"
 
-	"github.com/kaliv0/homie/internal"
+	"github.com/kaliv0/homie/internal/config"
+	"github.com/kaliv0/homie/internal/finder"
+	"github.com/kaliv0/homie/internal/runtime"
+	"github.com/kaliv0/homie/internal/storage"
 )
 
 var (
@@ -18,30 +21,30 @@ var (
   Use <tab> to pin and select multiple entries`,
 		Run: func(cmd *cobra.Command, _ []string) {
 			// read flags
-			if err := internal.ReadConfig(); err != nil {
-				internal.Logger.Print(err)
+			if err := config.ReadConfig(); err != nil {
+				runtime.Logger.Print(err)
 			}
 
 			// limit is read in order:
 			//'--limit <n>' cli flag -> .homierc  -> Flags().IntP() default val
 			limit := viper.GetInt("limit")
 			if limit <= 0 {
-				limit = internal.DefaultLimit
+				limit = storage.DefaultLimit
 			}
 
 			shouldPaste, err := cmd.Flags().GetBool("paste")
 			if err != nil {
-				internal.Logger.Fatal(err)
+				runtime.Logger.Fatal(err)
 			}
 
 			// fetch history-to-be-displayed
-			dbPath, err := internal.DBPath()
+			dbPath, err := config.DBPath()
 			if err != nil {
-				internal.Logger.Fatal(err)
+				runtime.Logger.Fatal(err)
 			}
-			output, err := internal.ListHistory(dbPath, limit)
+			output, err := finder.ListHistory(dbPath, limit)
 			if err != nil {
-				internal.Logger.Fatal(err)
+				runtime.Logger.Fatal(err)
 			}
 			if len(output) == 0 {
 				return
@@ -62,23 +65,23 @@ var (
 		Short:                 "Clear clipboard history",
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, _ []string) {
-			dbPath, err := internal.DBPath()
+			dbPath, err := config.DBPath()
 			if err != nil {
-				internal.Logger.Fatal(err)
+				runtime.Logger.Fatal(err)
 			}
-			db, err := internal.NewRepository(dbPath, false)
+			db, err := storage.NewRepository(dbPath, false)
 			if err != nil {
-				internal.Logger.Fatal(err)
+				runtime.Logger.Fatal(err)
 			}
 
 			defer func() {
 				if closeErr := db.Close(); closeErr != nil {
-					internal.Logger.Print(closeErr)
+					runtime.Logger.Print(closeErr)
 				}
 			}()
 
 			if err := db.Reset(); err != nil {
-				internal.Logger.Fatal(err)
+				runtime.Logger.Fatal(err)
 			}
 		},
 	}
@@ -88,7 +91,7 @@ func init() {
 	listHistoryCmd.Flags().IntP(
 		"limit",
 		"l",
-		internal.DefaultLimit,
+		storage.DefaultLimit,
 		"Limit the number of clipboard history items displayed",
 	)
 	listHistoryCmd.Flags().BoolP(
@@ -98,7 +101,7 @@ func init() {
 		"Paste selected history item",
 	)
 	if err := viper.BindPFlag("limit", listHistoryCmd.Flags().Lookup("limit")); err != nil {
-		internal.Logger.Fatal(err)
+		runtime.Logger.Fatal(err)
 	}
 	rootCmd.AddCommand(listHistoryCmd)
 	rootCmd.AddCommand(clearHistoryCmd)

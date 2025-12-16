@@ -1,4 +1,4 @@
-package internal
+package clipboard
 
 import (
 	"context"
@@ -7,10 +7,12 @@ import (
 	"syscall"
 
 	"golang.design/x/clipboard"
+
+	"github.com/kaliv0/homie/internal/storage"
 )
 
 // TrackClipboard watches for clipboard text changes and persists them.
-func TrackClipboard(db *Repository) error {
+func TrackClipboard(db *storage.Repository) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

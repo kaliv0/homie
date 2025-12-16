@@ -11,10 +11,10 @@ import (
 var Logger = log.New(os.Stderr, "Homie error: ", log.Llongfile)
 
 // StopAllInstances terminates other running homie processes.
-func StopAllInstances() {
+func StopAllInstances() error {
 	processes, err := process.Processes()
 	if err != nil {
-		Logger.Fatal(err)
+		return err
 	}
 	for _, p := range processes {
 		pName, err := p.Name()
@@ -27,4 +27,5 @@ func StopAllInstances() {
 			}
 		}
 	}
+	return nil
 }

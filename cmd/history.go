@@ -18,7 +18,10 @@ var (
   Use <tab> to pin and select multiple entries`,
 		Run: func(cmd *cobra.Command, _ []string) {
 			// read flags
-			internal.ReadConfig()
+			if err := internal.ReadConfig(); err != nil {
+				internal.Logger.Print(err)
+			}
+
 			// limit is read in order:
 			//'--limit <n>' cli flag -> .homierc  -> Flags().IntP() default val
 			limit := viper.GetInt("limit")
@@ -32,11 +35,18 @@ var (
 			}
 
 			// fetch history-to-be-displayed
-			dbPath := internal.DBPath()
-			output := internal.ListHistory(dbPath, limit)
+			dbPath, err := internal.DBPath()
+			if err != nil {
+				internal.Logger.Fatal(err)
+			}
+			output, err := internal.ListHistory(dbPath, limit)
+			if err != nil {
+				internal.Logger.Fatal(err)
+			}
 			if len(output) == 0 {
 				return
 			}
+
 			// put output inside clipboard
 			clipboard.Write(clipboard.FmtText, []byte(output))
 			if shouldPaste {
@@ -52,10 +62,24 @@ var (
 		Short:                 "Clear clipboard history",
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, _ []string) {
-			dbPath := internal.DBPath()
-			db := internal.NewRepository(dbPath, false)
-			defer db.Close()
-			db.Reset()
+			dbPath, err := internal.DBPath()
+			if err != nil {
+				internal.Logger.Fatal(err)
+			}
+			db, err := internal.NewRepository(dbPath, false)
+			if err != nil {
+				internal.Logger.Fatal(err)
+			}
+
+			defer func() {
+				if closeErr := db.Close(); closeErr != nil {
+					internal.Logger.Print(closeErr)
+				}
+			}()
+
+			if err := db.Reset(); err != nil {
+				internal.Logger.Fatal(err)
+			}
 		},
 	}
 )

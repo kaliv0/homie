@@ -14,7 +14,9 @@ var (
 		Short:                 "Start clipboard manager",
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, _ []string) {
-			internal.StopAllInstances()
+			if err := internal.StopAllInstances(); err != nil {
+				internal.Logger.Print(err)
+			}
 			if err := exec.Command(cmd.Root().Name(), "run").Start(); err != nil {
 				internal.Logger.Fatal(err)
 			}
@@ -25,10 +27,27 @@ var (
 		Use:    "run",
 		Hidden: true,
 		Run: func(cmd *cobra.Command, _ []string) {
-			dbPath := internal.DBPath()
-			db := internal.NewRepository(dbPath, true)
-			internal.CleanOldHistory(db)
-			internal.TrackClipboard(db)
+			dbPath, err := internal.DBPath()
+			if err != nil {
+				internal.Logger.Fatal(err)
+			}
+			db, err := internal.NewRepository(dbPath, true)
+			if err != nil {
+				internal.Logger.Fatal(err)
+			}
+
+			defer func() {
+				if closeErr := db.Close(); closeErr != nil {
+					internal.Logger.Print(closeErr)
+				}
+			}()
+
+			if err := internal.CleanOldHistory(db); err != nil {
+				internal.Logger.Print(err)
+			}
+			if err := internal.TrackClipboard(db); err != nil {
+				internal.Logger.Fatal(err)
+			}
 		},
 	}
 
@@ -37,7 +56,9 @@ var (
 		Short:                 "Stop clipboard manager",
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, _ []string) {
-			internal.StopAllInstances()
+			if err := internal.StopAllInstances(); err != nil {
+				internal.Logger.Fatal(err)
+			}
 		},
 	}
 )

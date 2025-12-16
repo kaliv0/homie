@@ -31,60 +31,58 @@ type Repository struct {
 	db *gorm.DB
 }
 
-// NewRepository opens (and optionally migrates) the SQLite database at dbPath.
-func NewRepository(dbPath string, shouldMigrate bool) *Repository {
+// NewRepository opens the SQLite database at dbPath.
+func NewRepository(dbPath string, shouldMigrate bool) (*Repository, error) {
 	// create db if not exists
 	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
 	if err != nil {
-		Logger.Fatal(err)
+		return nil, err
 	}
 
 	r := &Repository{db}
 	if shouldMigrate {
 		if err = r.db.AutoMigrate(&ClipboardItem{}); err != nil {
-			// best-effort close on migration failure, ignore close errors
 			if sqlDB, sqlErr := db.DB(); sqlErr == nil {
 				_ = sqlDB.Close()
 			}
-			Logger.Fatal(err)
+			return nil, err
 		}
 	}
-	return r
+	return r, nil
 }
 
-// Read returns clipboard items ordered by timestamp descending with pagination.
-func (r *Repository) Read(offset, limit int) []ClipboardItem {
+// Read returns clipboard items ordered by timestamp descending.
+func (r *Repository) Read(offset, limit int) ([]ClipboardItem, error) {
 	var items []ClipboardItem
 	result := r.db.Order("time_stamp desc").
 		Offset(offset).
 		Limit(limit).
 		Find(&items)
 	if result.Error != nil {
-		r.Close()
-		Logger.Fatal(result.Error)
+		return nil, result.Error
 	}
-	return items
+	return items, nil
 }
 
-// Write inserts a new clipboard item or bumps timestamp if the text already exists.
-func (r *Repository) Write(item []byte) {
+// Write inserts a new clipboard item or updates timestamp if it already exists.
+func (r *Repository) Write(item []byte) error {
 	hasher := sha256.New()
-	hasher.Write(item)
+	if _, err := hasher.Write(item); err != nil {
+		return err
+	}
 	textHash := hex.EncodeToString(hasher.Sum(nil))
 
 	var existingItem = ClipboardItem{}
 	result := r.db.Where(&ClipboardItem{TextHash: textHash}).First(&existingItem)
 	if result.Error != nil && !errors.Is(result.Error, gorm.ErrRecordNotFound) {
-		r.Close()
-		Logger.Fatal(result.Error)
+		return result.Error
 	}
 
 	if result.RowsAffected > 0 {
 		existingItem.TimeStamp = time.Now()
 		result := r.db.Save(&existingItem)
 		if result.Error != nil {
-			r.Close()
-			Logger.Fatal(result.Error)
+			return result.Error
 		}
 	} else {
 		result := r.db.Create(&ClipboardItem{
@@ -93,76 +91,73 @@ func (r *Repository) Write(item []byte) {
 			TimeStamp: time.Now(),
 		})
 		if result.Error != nil {
-			r.Close()
-			Logger.Fatal(result.Error)
+			return result.Error
 		}
 	}
+	return nil
 }
 
-// DeleteExcess removes the oldest records by count.
-func (r *Repository) DeleteExcess(deleteCount int) {
+// DeleteExcess removes the oldest records.
+func (r *Repository) DeleteExcess(deleteCount int) error {
 	result := r.db.Exec(`DELETE FROM clipboard_items WHERE id IN
 					  (SELECT id FROM clipboard_items ORDER BY time_stamp LIMIT ?)`, deleteCount)
 	if result.Error != nil {
-		r.Close()
-		Logger.Fatal(result.Error)
+		return result.Error
 	}
+	return nil
 }
 
-// DeleteOldest removes records older than the given TTL (days).
-func (r *Repository) DeleteOldest(ttl int) {
+// DeleteOldest removes records older than the given TTL.
+func (r *Repository) DeleteOldest(ttl int) error {
 	result := r.db.Exec(`DELETE FROM clipboard_items
        					WHERE time_stamp < datetime('now', ? || ' days', 'localtime')`, fmt.Sprintf("-%d", ttl))
 	if result.Error != nil {
-		r.Close()
-		Logger.Fatal(result.Error)
+		return result.Error
 	}
+	return nil
 }
 
-// Count returns the total number of clipboard records.
-func (r *Repository) Count() int {
+// Count returns the total number of records.
+func (r *Repository) Count() (int, error) {
 	var count int64
 	result := r.db.Model(&ClipboardItem{}).Count(&count)
 	if result.Error != nil {
-		r.Close()
-		Logger.Fatal(result.Error)
+		return 0, result.Error
 	}
-	return int(count)
+	return int(count), nil
 }
 
-// Reset deletes all clipboard records.
-func (r *Repository) Reset() {
+// Reset deletes all records.
+func (r *Repository) Reset() error {
 	result := r.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&ClipboardItem{})
 	if result.Error != nil {
-		r.Close()
-		Logger.Fatal(result.Error)
+		return result.Error
 	}
+	return nil
 }
 
-// Close releases the underlying database connection.
-func (r *Repository) Close() {
+// Close releases the database connection.
+func (r *Repository) Close() error {
 	// get generic db object sql.DB to use its functions
 	sqlDB, err := r.db.DB()
 	if err != nil {
-		Logger.Print(err)
-		return
+		return err
 	}
-	if err = sqlDB.Close(); err != nil {
-		Logger.Print(err)
-	}
+	return sqlDB.Close()
 }
 
 // CleanOldHistory trims clipboard history based on ttl or max_size settings.
-func CleanOldHistory(db *Repository) {
-	ReadConfig()
+func CleanOldHistory(db *Repository) error {
+	if err := ReadConfig(); err != nil {
+		Logger.Print(err)
+	}
 	if shouldClean := viper.GetBool("clean_up"); !shouldClean {
-		return
+		return nil
 	}
 
 	// ttl takes precedence over 'size limit' strategy
 	if ttl := viper.GetInt("ttl"); ttl > 0 {
-		db.DeleteOldest(ttl)
-		return
+		return db.DeleteOldest(ttl)
 	}
 
 	maxSize := viper.GetInt("max_size")
@@ -175,13 +170,19 @@ func CleanOldHistory(db *Repository) {
 		minLimit = DefaultLimit
 	}
 
-	if total := db.Count(); total > maxSize {
+	total, err := db.Count()
+	if err != nil {
+		return err
+	}
+
+	if total > maxSize {
 		if minLimit >= total {
-			return
+			return nil
 		}
 
 		if deleteCount := total - minLimit; deleteCount > 0 {
-			db.DeleteExcess(deleteCount)
+			return db.DeleteExcess(deleteCount)
 		}
 	}
+	return nil
 }

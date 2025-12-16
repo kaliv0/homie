@@ -10,33 +10,42 @@ import (
 )
 
 // TrackClipboard watches for clipboard text changes and persists them.
-func TrackClipboard(db *Repository) {
-	if err := clipboard.Init(); err != nil {
-		Logger.Fatal(err)
-	}
+func TrackClipboard(db *Repository) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	defer signal.Stop(sigChan)
 
-	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
-		<-sigChan
-		cancel()
+		select {
+		case <-sigChan:
+			cancel()
+		case <-ctx.Done():
+		}
 	}()
 
+	if err := clipboard.Init(); err != nil {
+		return err
+	}
+
 	changes := clipboard.Watch(ctx, clipboard.FmtText)
+	defer func() {
+		_ = db.Close()
+	}()
+
 	for {
 		select {
 		case item, ok := <-changes:
 			if !ok {
-				db.Close()
-				return
+				return nil
 			}
-			db.Write(item)
+			if err := db.Write(item); err != nil {
+				return err
+			}
 		case <-ctx.Done():
-			db.Close()
-			return
+			return nil
 		}
 	}
 }

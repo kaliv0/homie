@@ -17,6 +17,7 @@ Supports <i>fuzzy search</i>, <i>multi-select</i> and other adorable <i>chicaner
 ```shell
 $ go install github.com/kaliv0/homie@latest
 ```
+You would also need `xclip` installed as an external dependency
 
 ---
 
@@ -88,8 +89,7 @@ After that it will scan the database and if there are records above certain limi
 
 ## Known limitations
 
-Currently <i>homie</i> is design only for `bash`, doesn't work with `tmux` yet (although it's fairly easy to implement).<br>
-It is also tested only on Linux/Ubuntu so far.
+Currently <i>homie</i> doesn't work with `tmux` yet (although it's fairly easy to implement).<br>
 
 <p align="center">
   <img src="https://github.com/kaliv0/homie/blob/main/assets/doh.gif?raw=true" width="300" alt="D'OH">

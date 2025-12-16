@@ -6,7 +6,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"golang.design/x/clipboard"
+	gclip "golang.design/x/clipboard"
 
 	"github.com/kaliv0/homie/internal/storage"
 )
@@ -28,11 +28,11 @@ func TrackClipboard(db *storage.Repository) error {
 		}
 	}()
 
-	if err := clipboard.Init(); err != nil {
+	if err := gclip.Init(); err != nil {
 		return err
 	}
 
-	changes := clipboard.Watch(ctx, clipboard.FmtText)
+	changes := gclip.Watch(ctx, gclip.FmtText)
 	defer func() {
 		_ = db.Close()
 	}()

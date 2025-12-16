@@ -5,8 +5,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"golang.design/x/clipboard"
 
+	"github.com/kaliv0/homie/internal/clipboard"
 	"github.com/kaliv0/homie/internal/config"
 	"github.com/kaliv0/homie/internal/finder"
 	"github.com/kaliv0/homie/internal/runtime"
@@ -51,11 +51,17 @@ var (
 			}
 
 			// put output inside clipboard
-			clipboard.Write(clipboard.FmtText, []byte(output))
+			err = clipboard.WriteText(output)
+			if err != nil {
+				runtime.Logger.Fatal(err)
+			}
+
+			text, err := clipboard.Read()
+			if err != nil {
+				runtime.Logger.Fatal(err)
+			}
 			if shouldPaste {
-				fmt.Print(string(clipboard.Read(clipboard.FmtText)))
-			} else {
-				clipboard.Read(clipboard.FmtText)
+				fmt.Print(text)
 			}
 		},
 	}

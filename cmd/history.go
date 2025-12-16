@@ -54,9 +54,7 @@ var (
 		Run: func(cmd *cobra.Command, _ []string) {
 			dbPath := internal.DBPath()
 			db := internal.NewRepository(dbPath, false)
-			defer func() {
-				db.Close()
-			}()
+			defer db.Close()
 			db.Reset()
 		},
 	}

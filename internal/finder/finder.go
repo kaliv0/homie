@@ -25,7 +25,7 @@ func ListHistory(dbPath string, limit int) (string, error) {
 
 	defer func() {
 		if closeErr := db.Close(); closeErr != nil {
-			runtime.Logger.Print(closeErr)
+			runtime.Logger().Println(closeErr)
 		}
 	}()
 
@@ -76,7 +76,7 @@ func handleLoadChannel(ctx context.Context, history *[]storage.ClipboardItem, db
 					currentOffset += limit
 					page, err := db.Read(currentOffset, limit)
 					if err != nil {
-						runtime.Logger.Print(err)
+						runtime.Logger().Println(err)
 						continue
 					}
 					if len(page) > 0 {

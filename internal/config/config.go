@@ -9,25 +9,20 @@ import (
 	"github.com/spf13/viper"
 )
 
-var (
-	readConfigOnce sync.Once
-	readConfigErr  error
-)
-
 // ReadConfig loads configuration from ~/.homierc once.
-func ReadConfig() error {
-	readConfigOnce.Do(func() {
-		viper.SetConfigName(".homierc")
-		viper.SetConfigType("yaml")
-		viper.AddConfigPath("$HOME/")
-		if err := viper.ReadInConfig(); err != nil {
-			var configFileNotFoundError viper.ConfigFileNotFoundError
-			if !errors.As(err, &configFileNotFoundError) {
-				readConfigErr = err
-			}
+var ReadConfig = sync.OnceValue(readConfig)
+
+func readConfig() error {
+	viper.SetConfigName(".homierc")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath("$HOME/")
+	if err := viper.ReadInConfig(); err != nil {
+		var configFileNotFoundError viper.ConfigFileNotFoundError
+		if !errors.As(err, &configFileNotFoundError) {
+			return err
 		}
-	})
-	return readConfigErr
+	}
+	return nil
 }
 
 var (

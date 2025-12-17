@@ -152,7 +152,7 @@ func (r *Repository) Close() error {
 // CleanOldHistory trims clipboard history based on ttl or max_size settings.
 func CleanOldHistory(db *Repository) error {
 	if err := config.ReadConfig(); err != nil {
-		runtime.Logger.Print(err)
+		runtime.Logger().Println(err)
 	}
 	if shouldClean := viper.GetBool("clean_up"); !shouldClean {
 		return nil

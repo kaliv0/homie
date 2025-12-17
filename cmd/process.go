@@ -18,10 +18,10 @@ var (
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, _ []string) {
 			if err := runtime.StopAllInstances(); err != nil {
-				runtime.Logger.Print(err)
+				runtime.Logger().Println(err)
 			}
 			if err := exec.Command(cmd.Root().Name(), "run").Start(); err != nil {
-				runtime.Logger.Fatal(err)
+				runtime.Logger().Fatal(err)
 			}
 		},
 	}
@@ -32,24 +32,24 @@ var (
 		Run: func(cmd *cobra.Command, _ []string) {
 			dbPath, err := config.DBPath()
 			if err != nil {
-				runtime.Logger.Fatal(err)
+				runtime.Logger().Fatal(err)
 			}
 			db, err := storage.NewRepository(dbPath, true)
 			if err != nil {
-				runtime.Logger.Fatal(err)
+				runtime.Logger().Fatal(err)
 			}
 
 			defer func() {
 				if closeErr := db.Close(); closeErr != nil {
-					runtime.Logger.Print(closeErr)
+					runtime.Logger().Println(closeErr)
 				}
 			}()
 
 			if err := storage.CleanOldHistory(db); err != nil {
-				runtime.Logger.Print(err)
+				runtime.Logger().Println(err)
 			}
 			if err := clipboard.TrackClipboard(db); err != nil {
-				runtime.Logger.Fatal(err)
+				runtime.Logger().Fatal(err)
 			}
 		},
 	}
@@ -60,7 +60,7 @@ var (
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, _ []string) {
 			if err := runtime.StopAllInstances(); err != nil {
-				runtime.Logger.Fatal(err)
+				runtime.Logger().Fatal(err)
 			}
 		},
 	}

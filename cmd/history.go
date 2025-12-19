@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os/exec"
 	"runtime"
 
 	"github.com/spf13/cobra"
@@ -55,6 +56,10 @@ var (
 			// put output inside clipboard
 			os := runtime.GOOS
 			useXclip := viper.GetBool("use_xclip")
+			if _, err := exec.LookPath("xclip"); err != nil {
+				log.Logger().Println("xclip not found, falling back to \"golang.design/x/clipboard\"")
+				useXclip = false
+			}
 			if os == "linux" && useXclip {
 				// NB since golang.design/x/clipboard doesn't always
 				// write successfully to the clipboard and supports only x11 (but not Wayland)

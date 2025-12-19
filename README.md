@@ -66,7 +66,7 @@ Deletes all items from the `homie.db` store
 $ homie shell
 ```
 
-Generates a shell configuration for your `.bashrc` that will start tha application automatically<br>
+Generates a shell configuration for your `.bashrc` that will start the application automatically<br>
 as well add extra key bindings for opening the preview window.
 
 ```shell
@@ -89,7 +89,7 @@ After that it will scan the database and if there are records above certain limi
 
 ## Known limitations
 
-Currently <i>homie</i> doesn't work with `tmux` yet (although it's fairly easy to implement).<br>
+Currently <i>homie</i> is designed only for `bash`, it doesn't work with `tmux` yet (although it's fairly easy to implement).<br>
 
 <p align="center">
   <img src="https://github.com/kaliv0/homie/blob/main/assets/doh.gif?raw=true" width="300" alt="D'OH">

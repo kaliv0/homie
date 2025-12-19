@@ -54,13 +54,13 @@ var (
 			}
 
 			// put output inside clipboard
-			os := runtime.GOOS
+			goos := runtime.GOOS
 			useXclip := viper.GetBool("use_xclip")
 			if _, err := exec.LookPath("xclip"); err != nil {
 				log.Logger().Println("xclip not found, falling back to \"golang.design/x/clipboard\"")
 				useXclip = false
 			}
-			if os == "linux" && useXclip {
+			if goos == "linux" && useXclip {
 				// NB since golang.design/x/clipboard doesn't always
 				// write successfully to the clipboard and supports only x11 (but not Wayland)
 				// we use this custom working-around based on xclip instead
@@ -77,6 +77,9 @@ var (
 					fmt.Print(text)
 				}
 			} else {
+				if err := gclip.Init(); err != nil {
+					log.Logger().Fatal(err)
+				}
 				gclip.Write(gclip.FmtText, []byte(output))
 				text := gclip.Read(gclip.FmtText)
 				if shouldPaste {

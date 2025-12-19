@@ -10,7 +10,7 @@ import (
 var Logger = sync.OnceValue(getLogger)
 
 func getLogger() *log.Logger {
-	l := log.New(os.Stderr, "ERROR: ", log.Llongfile)
+	l := log.New(os.Stderr, "D'OH: ", log.Llongfile)
 
 	//// Add log config below:
 	//logFile, err := os.OpenFile("homie.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)

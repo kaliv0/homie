@@ -77,6 +77,9 @@ var (
 					fmt.Print(text)
 				}
 			} else {
+				if err := gclip.Init(); err != nil {
+					log.Logger().Fatal(err)
+				}
 				gclip.Write(gclip.FmtText, []byte(output))
 				text := gclip.Read(gclip.FmtText)
 				if shouldPaste {

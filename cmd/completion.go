@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/kaliv0/homie/internal/runtime"
+	"github.com/kaliv0/homie/internal/log"
 )
 
 var (
@@ -18,7 +18,7 @@ $ source <(%s completion | tee -a "$HOME/.bash_completion")`, rootCmd.Root().Nam
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, _ []string) {
 			if err := cmd.Root().GenBashCompletion(os.Stdout); err != nil {
-				runtime.Logger().Fatal(err)
+				log.Logger().Fatal(err)
 			}
 		},
 	}

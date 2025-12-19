@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/kaliv0/homie/internal/config"
-	"github.com/kaliv0/homie/internal/runtime"
+	"github.com/kaliv0/homie/internal/log"
 )
 
 const (
@@ -113,7 +113,7 @@ func (r *Repository) DeleteExcess(deleteCount int) error {
 // DeleteOldest removes records older than the given TTL.
 func (r *Repository) DeleteOldest(ttl int) error {
 	result := r.db.Exec(`DELETE FROM clipboard_items
-       					WHERE time_stamp < datetime('now', ? || ' days', 'localtime')`, fmt.Sprintf("-%d", ttl))
+       					WHERE time_stamp < datetime('now', concat(?, ' days'), 'localtime')`, fmt.Sprintf("-%d", ttl))
 	if result.Error != nil {
 		return result.Error
 	}
@@ -152,7 +152,7 @@ func (r *Repository) Close() error {
 // CleanOldHistory trims clipboard history based on ttl or max_size settings.
 func CleanOldHistory(db *Repository) error {
 	if err := config.ReadConfig(); err != nil {
-		runtime.Logger().Println(err)
+		log.Logger().Println(err)
 	}
 	if shouldClean := viper.GetBool("clean_up"); !shouldClean {
 		return nil

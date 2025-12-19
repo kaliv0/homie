@@ -7,7 +7,8 @@ import (
 
 	"github.com/kaliv0/homie/internal/clipboard"
 	"github.com/kaliv0/homie/internal/config"
-	"github.com/kaliv0/homie/internal/runtime"
+	"github.com/kaliv0/homie/internal/daemon"
+	"github.com/kaliv0/homie/internal/log"
 	"github.com/kaliv0/homie/internal/storage"
 )
 
@@ -17,11 +18,11 @@ var (
 		Short:                 "Start clipboard manager",
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, _ []string) {
-			if err := runtime.StopAllInstances(); err != nil {
-				runtime.Logger().Println(err)
+			if err := daemon.StopAllInstances(); err != nil {
+				log.Logger().Println(err)
 			}
 			if err := exec.Command(cmd.Root().Name(), "run").Start(); err != nil {
-				runtime.Logger().Fatal(err)
+				log.Logger().Fatal(err)
 			}
 		},
 	}
@@ -32,24 +33,24 @@ var (
 		Run: func(cmd *cobra.Command, _ []string) {
 			dbPath, err := config.DBPath()
 			if err != nil {
-				runtime.Logger().Fatal(err)
+				log.Logger().Fatal(err)
 			}
 			db, err := storage.NewRepository(dbPath, true)
 			if err != nil {
-				runtime.Logger().Fatal(err)
+				log.Logger().Fatal(err)
 			}
 
 			defer func() {
 				if closeErr := db.Close(); closeErr != nil {
-					runtime.Logger().Println(closeErr)
+					log.Logger().Println(closeErr)
 				}
 			}()
 
 			if err := storage.CleanOldHistory(db); err != nil {
-				runtime.Logger().Println(err)
+				log.Logger().Println(err)
 			}
 			if err := clipboard.TrackClipboard(db); err != nil {
-				runtime.Logger().Fatal(err)
+				log.Logger().Fatal(err)
 			}
 		},
 	}
@@ -59,8 +60,8 @@ var (
 		Short:                 "Stop clipboard manager",
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, _ []string) {
-			if err := runtime.StopAllInstances(); err != nil {
-				runtime.Logger().Fatal(err)
+			if err := daemon.StopAllInstances(); err != nil {
+				log.Logger().Fatal(err)
 			}
 		},
 	}

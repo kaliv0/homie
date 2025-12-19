@@ -17,7 +17,7 @@ Supports <i>fuzzy search</i>, <i>multi-select</i> and other adorable <i>chicaner
 ```shell
 $ go install github.com/kaliv0/homie@latest
 ```
-You would also need `xclip` installed as an external dependency
+On `Linux` you would also need `xclip` installed as an external dependency
 
 ---
 

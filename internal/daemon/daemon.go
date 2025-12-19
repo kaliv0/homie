@@ -1,14 +1,12 @@
-package runtime
+package daemon
 
 import (
-	"log"
 	"os"
 
 	"github.com/shirou/gopsutil/process"
-)
 
-// Logger is the shared logger used across the application.
-var Logger = log.New(os.Stderr, "Homie error: ", log.Llongfile)
+	"github.com/kaliv0/homie/internal/log"
+)
 
 // StopAllInstances terminates other running homie processes.
 func StopAllInstances() error {
@@ -22,8 +20,8 @@ func StopAllInstances() error {
 			continue // Skip inaccessible processes
 		}
 		if pName == "homie" && int32(os.Getpid()) != p.Pid {
-			if err := p.Terminate(); err != nil {
-				Logger.Print(err) // Log but continue trying other instances
+			if err = p.Terminate(); err != nil {
+				log.Logger().Println(err) // Log but continue trying other instances
 			}
 		}
 	}

@@ -9,7 +9,7 @@ import (
 
 	"github.com/ktr0731/go-fuzzyfinder"
 
-	"github.com/kaliv0/homie/internal/runtime"
+	"github.com/kaliv0/homie/internal/log"
 	"github.com/kaliv0/homie/internal/storage"
 )
 
@@ -25,7 +25,7 @@ func ListHistory(dbPath string, limit int) (string, error) {
 
 	defer func() {
 		if closeErr := db.Close(); closeErr != nil {
-			runtime.Logger.Print(closeErr)
+			log.Logger().Println(closeErr)
 		}
 	}()
 
@@ -76,7 +76,7 @@ func handleLoadChannel(ctx context.Context, history *[]storage.ClipboardItem, db
 					currentOffset += limit
 					page, err := db.Read(currentOffset, limit)
 					if err != nil {
-						runtime.Logger.Print(err)
+						log.Logger().Println(err)
 						continue
 					}
 					if len(page) > 0 {

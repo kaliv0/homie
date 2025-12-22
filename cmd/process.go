@@ -35,8 +35,12 @@ var (
 			if err != nil {
 				log.Logger().Fatal(err)
 			}
-			db, err := storage.NewRepository(dbPath, true)
+			db, err := storage.NewRepository(dbPath)
 			if err != nil {
+				log.Logger().Fatal(err)
+			}
+
+			if err := db.AutoMigrate(); err != nil {
 				log.Logger().Fatal(err)
 			}
 

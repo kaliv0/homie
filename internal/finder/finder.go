@@ -18,7 +18,7 @@ var mu sync.RWMutex
 // ListHistory loads clipboard history and presents a fuzzy finder.
 func ListHistory(dbPath string, limit int) (string, error) {
 	// load history
-	db, err := storage.NewRepository(dbPath, false)
+	db, err := storage.NewRepository(dbPath)
 	if err != nil {
 		return "", err
 	}

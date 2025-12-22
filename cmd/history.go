@@ -98,7 +98,7 @@ var (
 			if err != nil {
 				log.Logger().Fatal(err)
 			}
-			db, err := storage.NewRepository(dbPath, false)
+			db, err := storage.NewRepository(dbPath)
 			if err != nil {
 				log.Logger().Fatal(err)
 			}

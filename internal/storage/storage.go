@@ -35,23 +35,24 @@ type Repository struct {
 }
 
 // NewRepository opens the SQLite database at dbPath.
-func NewRepository(dbPath string, shouldMigrate bool) (*Repository, error) {
+func NewRepository(dbPath string) (*Repository, error) {
 	// create db if not exists
 	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
 	if err != nil {
 		return nil, err
 	}
+	return &Repository{db}, nil
+}
 
-	r := &Repository{db}
-	if shouldMigrate {
-		if err = r.db.AutoMigrate(&ClipboardItem{}); err != nil {
-			if sqlDB, sqlErr := db.DB(); sqlErr == nil {
-				_ = sqlDB.Close()
-			}
-			return nil, err
-		}
+// AutoMigrate runs gorm's auto migration for ClipboardItem model.
+func (r *Repository) AutoMigrate() error {
+	if err := r.db.AutoMigrate(&ClipboardItem{}); err != nil {
+		// gorm.AutoMigrate manages connection automatically
+		// we close it manually only if an error occurs during migration
+		_ = r.Close()
+		return err
 	}
-	return r, nil
+	return nil
 }
 
 // Read returns clipboard items ordered by timestamp descending.
@@ -141,7 +142,6 @@ func (r *Repository) Reset() error {
 
 // Close releases the database connection.
 func (r *Repository) Close() error {
-	// get generic db object sql.DB to use its functions
 	sqlDB, err := r.db.DB()
 	if err != nil {
 		return err

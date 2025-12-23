@@ -41,6 +41,17 @@ func NewRepository(dbPath string) (*Repository, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// verify connection
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, err
+	}
+	if err = sqlDB.Ping(); err != nil {
+		_ = sqlDB.Close()
+		return nil, err
+	}
+
 	return &Repository{db}, nil
 }
 

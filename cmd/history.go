@@ -63,7 +63,7 @@ var (
 			if goos == "linux" && useXclip {
 				// NB since golang.design/x/clipboard doesn't always
 				// write successfully to the clipboard and supports only x11 (but not Wayland)
-				// we use this custom working-around based on xclip instead
+				// we use this custom workaround based on xclip instead
 				err = clipboard.Write(output)
 				if err != nil {
 					log.Logger().Fatal(err)

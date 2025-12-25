@@ -22,7 +22,7 @@ const (
 	DefaultMaxSize = 500
 
 	maxDbConnections = 2
-	connMaxLifetime  = 12 * time.Hour
+	connMaxTimespan  = 5 * time.Minute
 	dbBusyTimeout    = 5000 // 5s in milliseconds
 	journalMode      = "WAL"
 	dbSync           = "NORMAL"
@@ -58,7 +58,8 @@ func NewRepository(dbPath string) (*Repository, error) {
 	// set SQLite connection pool settings suited for a single-file DB
 	db.SetMaxOpenConns(maxDbConnections)
 	db.SetMaxIdleConns(maxDbConnections)
-	db.SetConnMaxLifetime(connMaxLifetime) // TrackingClipboard is a long-running background task
+	db.SetConnMaxLifetime(connMaxTimespan)
+	db.SetConnMaxIdleTime(connMaxTimespan)
 
 	// set SQLite pragmas
 	pragmas := []string{

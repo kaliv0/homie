@@ -39,21 +39,21 @@ func readConfig() error {
 }
 
 var (
-	dbPathOnce sync.Once
-	dbPathVal  string
-	dbPathErr  error
+	once    sync.Once
+	dbPath  string
+	pathErr error
 )
 
 // DBPath returns the absolute path to the SQLite database file.
 func DBPath() (string, error) {
-	dbPathOnce.Do(func() {
+	once.Do(func() {
 		var subDirsList []string
-		if xdgConf := os.Getenv(xdgConf); xdgConf != "" {
-			subDirsList = append(subDirsList, xdgConf)
+		if xdgHome := os.Getenv(xdgConf); xdgHome != "" {
+			subDirsList = append(subDirsList, xdgHome)
 		} else {
 			homeDir, err := os.UserHomeDir()
 			if err != nil {
-				dbPathErr = fmt.Errorf("failed to get user home directory: %w", err)
+				pathErr = fmt.Errorf("failed to get user home directory: %w", err)
 				return
 			}
 			subDirsList = append(subDirsList, homeDir, dbConfDirName)
@@ -61,10 +61,10 @@ func DBPath() (string, error) {
 		subDirsList = append(subDirsList, dbSubdirName)
 		configDir := filepath.Join(subDirsList...)
 		if err := os.MkdirAll(configDir, dbConfDirPerm); err != nil {
-			dbPathErr = fmt.Errorf("failed to create config directory %q: %w", configDir, err)
+			pathErr = fmt.Errorf("failed to create config directory %q: %w", configDir, err)
 			return
 		}
-		dbPathVal = filepath.Join(configDir, dbFileName)
+		dbPath = filepath.Join(configDir, dbFileName)
 	})
-	return dbPathVal, dbPathErr
+	return dbPath, pathErr
 }

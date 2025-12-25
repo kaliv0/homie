@@ -110,6 +110,7 @@ var (
 			}()
 
 			if err := db.Reset(); err != nil {
+				_ = db.Close()
 				log.Logger().Fatal(err)
 			}
 		},

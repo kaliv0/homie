@@ -2,14 +2,14 @@ package storage
 
 import (
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"time"
 
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
-
+	"github.com/jmoiron/sqlx"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/spf13/viper"
 
 	"github.com/kaliv0/homie/internal/config"
@@ -23,44 +23,52 @@ const (
 
 // ClipboardItem represents a clipboard entry persisted in the database.
 type ClipboardItem struct {
-	ID        uint `gorm:"primaryKey"`
-	ClipText  string
-	TextHash  string
-	TimeStamp time.Time `gorm:"index"`
+	ID        int       `db:"id"`
+	ClipText  string    `db:"clip_text"`
+	TextHash  string    `db:"text_hash"`
+	TimeStamp time.Time `db:"time_stamp"`
 }
 
 // Repository wraps database access for clipboard items.
 type Repository struct {
-	db *gorm.DB
+	db *sqlx.DB
 }
 
 // NewRepository opens the SQLite database at dbPath.
 func NewRepository(dbPath string) (*Repository, error) {
 	// create db if not exists
-	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
+	db, err := sqlx.Connect("sqlite3", dbPath)
 	if err != nil {
 		return nil, err
 	}
 
 	// verify connection
-	sqlDB, err := db.DB()
-	if err != nil {
-		return nil, err
-	}
-	if err = sqlDB.Ping(); err != nil {
-		_ = sqlDB.Close()
+	if err = db.Ping(); err != nil {
+		_ = db.Close()
 		return nil, err
 	}
 
 	return &Repository{db}, nil
 }
 
-// AutoMigrate runs gorm's auto migration for ClipboardItem model.
+// AutoMigrate creates the clipboard_items table if it doesn't exist.
 func (r *Repository) AutoMigrate() error {
-	if err := r.db.AutoMigrate(&ClipboardItem{}); err != nil {
-		// gorm.AutoMigrate manages connection automatically
-		// we close it manually only if an error occurs during migration
-		_ = r.Close()
+	_, err := r.db.Exec(`
+		CREATE TABLE IF NOT EXISTS clipboard_items (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			clip_text TEXT NOT NULL,
+			text_hash TEXT NOT NULL,
+			time_stamp DATETIME NOT NULL
+		)
+	`)
+	if err != nil {
+		return err
+	}
+	// Create index on time_stamp for better query performance
+	_, err = r.db.Exec(`
+		CREATE INDEX IF NOT EXISTS idx_time_stamp ON clipboard_items(time_stamp)
+	`)
+	if err != nil {
 		return err
 	}
 	return nil
@@ -69,12 +77,14 @@ func (r *Repository) AutoMigrate() error {
 // Read returns clipboard items ordered by timestamp descending.
 func (r *Repository) Read(offset, limit int) ([]ClipboardItem, error) {
 	var items []ClipboardItem
-	result := r.db.Order("time_stamp desc").
-		Offset(offset).
-		Limit(limit).
-		Find(&items)
-	if result.Error != nil {
-		return nil, result.Error
+	err := r.db.Select(&items, `
+		SELECT id, clip_text, text_hash, time_stamp 
+		FROM clipboard_items 
+		ORDER BY time_stamp DESC 
+		LIMIT ? OFFSET ?
+	`, limit, offset)
+	if err != nil {
+		return nil, err
 	}
 	return items, nil
 }
@@ -87,77 +97,72 @@ func (r *Repository) Write(item []byte) error {
 	}
 	textHash := hex.EncodeToString(hasher.Sum(nil))
 
-	var existingItem = ClipboardItem{}
-	result := r.db.Where(&ClipboardItem{TextHash: textHash}).First(&existingItem)
-	if result.Error != nil && !errors.Is(result.Error, gorm.ErrRecordNotFound) {
-		return result.Error
+	var existingItem ClipboardItem
+	err := r.db.Get(&existingItem, `
+		SELECT id, clip_text, text_hash, time_stamp 
+		FROM clipboard_items 
+		WHERE text_hash = ?
+	`, textHash)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		_, err = r.db.Exec(`
+			INSERT INTO clipboard_items (clip_text, text_hash, time_stamp) 
+			VALUES (?, ?, ?)
+		`, string(item), textHash, time.Now())
+		return err
+	} else if err != nil {
+		return err
 	}
 
-	if result.RowsAffected > 0 {
-		existingItem.TimeStamp = time.Now()
-		result = r.db.Save(&existingItem)
-		if result.Error != nil {
-			return result.Error
-		}
-	} else {
-		result = r.db.Create(&ClipboardItem{
-			ClipText:  string(item),
-			TextHash:  textHash,
-			TimeStamp: time.Now(),
-		})
-		if result.Error != nil {
-			return result.Error
-		}
-	}
-	return nil
+	_, err = r.db.Exec(`
+		UPDATE clipboard_items 
+		SET time_stamp = ? 
+		WHERE id = ?
+	`, time.Now(), existingItem.ID)
+	return err
 }
 
 // DeleteExcess removes the oldest records.
 func (r *Repository) DeleteExcess(deleteCount int) error {
-	result := r.db.Exec(`DELETE FROM clipboard_items WHERE id IN
-					  (SELECT id FROM clipboard_items ORDER BY time_stamp LIMIT ?)`, deleteCount)
-	if result.Error != nil {
-		return result.Error
-	}
-	return nil
+	_, err := r.db.Exec(`
+		DELETE FROM clipboard_items 
+		WHERE id IN (
+			SELECT id FROM clipboard_items 
+			ORDER BY time_stamp 
+			LIMIT ?
+		)
+	`, deleteCount)
+	return err
 }
 
 // DeleteOldest removes records older than the given TTL.
 func (r *Repository) DeleteOldest(ttl int) error {
-	result := r.db.Exec(`DELETE FROM clipboard_items
-       					WHERE time_stamp < datetime('now', concat(?, ' days'), 'localtime')`, fmt.Sprintf("-%d", ttl))
-	if result.Error != nil {
-		return result.Error
-	}
-	return nil
+	_, err := r.db.Exec(`
+		DELETE FROM clipboard_items
+		WHERE time_stamp < datetime('now', concat(?, ' days'), 'localtime')
+	`, fmt.Sprintf("-%d", ttl))
+	return err
 }
 
 // Count returns the total number of records.
 func (r *Repository) Count() (int, error) {
-	var count int64
-	result := r.db.Model(&ClipboardItem{}).Count(&count)
-	if result.Error != nil {
-		return 0, result.Error
+	var count int
+	err := r.db.Get(&count, `SELECT COUNT(*) FROM clipboard_items`)
+	if err != nil {
+		return 0, err
 	}
-	return int(count), nil
+	return count, nil
 }
 
 // Reset deletes all records.
 func (r *Repository) Reset() error {
-	result := r.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&ClipboardItem{})
-	if result.Error != nil {
-		return result.Error
-	}
-	return nil
+	_, err := r.db.Exec(`DELETE FROM clipboard_items`)
+	return err
 }
 
 // Close releases the database connection.
 func (r *Repository) Close() error {
-	sqlDB, err := r.db.DB()
-	if err != nil {
-		return err
-	}
-	return sqlDB.Close()
+	return r.db.Close()
 }
 
 // CleanOldHistory trims clipboard history based on ttl or max_size settings.

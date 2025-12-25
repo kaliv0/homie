@@ -40,20 +40,22 @@ var (
 				log.Logger().Fatal(err)
 			}
 
-			if err := db.AutoMigrate(); err != nil {
-				log.Logger().Fatal(err)
-			}
-
 			defer func() {
 				if closeErr := db.Close(); closeErr != nil {
 					log.Logger().Println(closeErr)
 				}
 			}()
 
+			if err := db.AutoMigrate(); err != nil {
+				_ = db.Close()
+				log.Logger().Fatal(err)
+			}
+
 			if err := storage.CleanOldHistory(db); err != nil {
 				log.Logger().Println(err)
 			}
 			if err := clipboard.TrackClipboard(db); err != nil {
+				_ = db.Close()
 				log.Logger().Fatal(err)
 			}
 		},

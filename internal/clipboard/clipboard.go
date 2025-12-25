@@ -31,11 +31,7 @@ func TrackClipboard(db *storage.Repository) error {
 	if err := gclip.Init(); err != nil {
 		return err
 	}
-
 	changes := gclip.Watch(ctx, gclip.FmtText)
-	defer func() {
-		_ = db.Close()
-	}()
 
 	for {
 		select {

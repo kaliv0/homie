@@ -3,13 +3,13 @@ module github.com/kaliv0/homie
 go 1.24.4
 
 require (
+	github.com/jmoiron/sqlx v1.4.0
 	github.com/ktr0731/go-fuzzyfinder v0.9.0
+	github.com/mattn/go-sqlite3 v1.14.32
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
 	golang.design/x/clipboard v0.7.1
-	gorm.io/driver/sqlite v1.6.0
-	gorm.io/gorm v1.31.1
 )
 
 require (
@@ -21,12 +21,9 @@ require (
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
-	github.com/jinzhu/inflection v1.0.0 // indirect
-	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/ktr0731/go-ansisgr v0.1.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.3.0 // indirect
 	github.com/mattn/go-runewidth v0.0.19 // indirect
-	github.com/mattn/go-sqlite3 v1.14.32 // indirect
 	github.com/nsf/termbox-go v1.1.1 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/pkg/errors v0.9.1 // indirect

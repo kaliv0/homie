@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -14,11 +15,6 @@ import (
 
 	"github.com/kaliv0/homie/internal/config"
 	"github.com/kaliv0/homie/internal/log"
-)
-
-const (
-	DefaultLimit   = 20
-	DefaultMaxSize = 500
 )
 
 // ClipboardItem represents a clipboard entry persisted in the database.
@@ -46,6 +42,25 @@ func NewRepository(dbPath string) (*Repository, error) {
 	if err = db.Ping(); err != nil {
 		_ = db.Close()
 		return nil, err
+	}
+
+	// set SQLite connection pool settings suited for a single-file DB
+	db.SetMaxOpenConns(config.MaxDbConnections)
+	db.SetMaxIdleConns(config.MaxDbConnections)
+	db.SetConnMaxLifetime(config.ConnMaxLifetime) // TrackingClipboard is a long-running background task
+
+	// set SQLite pragmas
+	pragmas := []string{
+		fmt.Sprintf(`PRAGMA busy_timeout = %d`, config.DbBusyTimeout),
+		fmt.Sprintf(`PRAGMA journal_mode = %s`, config.JournalMode),
+		fmt.Sprintf(`PRAGMA synchronous = %s`, config.Sync),
+	}
+
+	for _, pragma := range pragmas {
+		if _, err = db.Exec(pragma); err != nil {
+			_ = db.Close()
+			return nil, fmt.Errorf("failed to set pragma %q: %w", pragma, err)
+		}
 	}
 
 	return &Repository{db}, nil
@@ -140,7 +155,7 @@ func (r *Repository) DeleteOldest(ttl int) error {
 	_, err := r.db.Exec(`
 		DELETE FROM clipboard_items
 		WHERE time_stamp < datetime('now', concat(?, ' days'), 'localtime')
-	`, fmt.Sprintf("-%d", ttl))
+	`, "-"+strconv.Itoa(ttl))
 	return err
 }
 
@@ -181,12 +196,12 @@ func CleanOldHistory(db *Repository) error {
 
 	maxSize := viper.GetInt("max_size")
 	if maxSize <= 0 {
-		maxSize = DefaultMaxSize
+		maxSize = config.DefaultMaxSize
 	}
 
 	minLimit := viper.GetInt("limit")
 	if minLimit <= 0 {
-		minLimit = DefaultLimit
+		minLimit = config.DefaultLimit
 	}
 
 	total, err := db.Count()

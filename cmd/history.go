@@ -32,7 +32,7 @@ var (
 			//'--limit <n>' cli flag -> .homierc  -> Flags().IntP() default val
 			limit := viper.GetInt("limit")
 			if limit <= 0 {
-				limit = storage.DefaultLimit
+				limit = config.DefaultLimit
 			}
 
 			shouldPaste, err := cmd.Flags().GetBool("paste")
@@ -83,7 +83,7 @@ var (
 				gclip.Write(gclip.FmtText, []byte(output))
 				text := gclip.Read(gclip.FmtText)
 				if shouldPaste {
-					fmt.Print(string(text))
+					fmt.Print(text)
 				}
 			}
 		},
@@ -121,7 +121,7 @@ func init() {
 	listHistoryCmd.Flags().IntP(
 		"limit",
 		"l",
-		storage.DefaultLimit,
+		config.DefaultLimit,
 		"Limit the number of clipboard history items displayed",
 	)
 	listHistoryCmd.Flags().BoolP(

@@ -2,9 +2,6 @@ package clipboard
 
 import (
 	"context"
-	"os"
-	"os/signal"
-	"syscall"
 
 	gclip "golang.design/x/clipboard"
 
@@ -12,22 +9,7 @@ import (
 )
 
 // TrackClipboard watches for clipboard text changes and persists them.
-func TrackClipboard(db *storage.Repository) error {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-	defer signal.Stop(sigChan)
-
-	go func() {
-		select {
-		case <-sigChan:
-			cancel()
-		case <-ctx.Done():
-		}
-	}()
-
+func TrackClipboard(ctx context.Context, db *storage.Repository) error {
 	if err := gclip.Init(); err != nil {
 		return err
 	}

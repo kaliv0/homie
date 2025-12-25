@@ -1,7 +1,10 @@
 package cmd
 
 import (
+	"context"
 	"os/exec"
+	"os/signal"
+	"syscall"
 
 	"github.com/spf13/cobra"
 
@@ -54,7 +57,14 @@ var (
 			if err := storage.CleanOldHistory(db); err != nil {
 				log.Logger().Println(err)
 			}
-			if err := clipboard.TrackClipboard(db); err != nil {
+
+			signalCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+			defer stop()
+
+			ctx, cancel := context.WithTimeout(signalCtx, config.ConnMaxLifetime)
+			defer cancel()
+
+			if err := clipboard.TrackClipboard(ctx, db); err != nil {
 				_ = db.Close()
 				log.Logger().Fatal(err)
 			}

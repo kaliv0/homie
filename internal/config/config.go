@@ -5,8 +5,24 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/spf13/viper"
+)
+
+// DB & FS configuration constants
+const (
+	DefaultLimit   = 20
+	DefaultMaxSize = 500
+
+	MaxDbConnections = 2
+	ConnMaxLifetime  = 12 * time.Hour
+
+	DbBusyTimeout = 5000 // 5s in milliseconds
+	JournalMode   = "WAL"
+	Sync          = "NORMAL"
+
+	ConfDirPerm = 0755
 )
 
 // ReadConfig loads configuration from ~/.homierc once.
@@ -48,7 +64,7 @@ func DBPath() (string, error) {
 		}
 		subDirsList = append(subDirsList, "homie")
 		configDir := filepath.Join(subDirsList...)
-		if err := os.MkdirAll(configDir, 0755); err != nil {
+		if err := os.MkdirAll(configDir, ConfDirPerm); err != nil {
 			dbPathErr = err
 			return
 		}

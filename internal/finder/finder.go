@@ -3,7 +3,6 @@ package finder
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 	"sync"
 
@@ -54,7 +53,7 @@ func ListHistory(dbPath string, limit int) (string, error) {
 		return "", nil
 	}
 
-	var out []string
+	out := make([]string, 0, len(idxs))
 	for _, i := range idxs {
 		out = append(out, history[i].ClipText)
 	}
@@ -112,7 +111,7 @@ func findItemIdxs(history *[]storage.ClipboardItem, loadMore chan struct{}) ([]i
 				return ""
 			}
 			// return string to display in previewWindow
-			return fmt.Sprint((*history)[i].ClipText)
+			return (*history)[i].ClipText
 		}),
 		// reloads passed history slice automatically when items appended
 		fuzzyfinder.WithHotReloadLock(mu.RLocker()),

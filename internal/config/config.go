@@ -6,33 +6,18 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-	"time"
 
 	"github.com/spf13/viper"
 )
 
-// DB & FS configuration constants
 const (
-	DefaultLimit   = 20
-	DefaultMaxSize = 500
-
-	// DB configs
-	MaxDbConnections = 2
-	ConnMaxLifetime  = 12 * time.Hour
-	// SQLite pragmas
-	DbBusyTimeout = 5000 // 5s in milliseconds
-	JournalMode   = "WAL"
-	Sync          = "NORMAL"
-
-	// FS configs
-	XDGConf     = "XDG_CONFIG_HOME"
-	AppConfPath = "$HOME/"
-	// db
+	XDGConf       = "XDG_CONFIG_HOME"
+	AppConfPath   = "$HOME/"
 	DbConfDirPerm = 0755
 	DbConfDirName = ".config"
 	DbSubdirName  = "homie"
 	DbFileName    = "homie.db"
-	// app
+
 	ConfFileName = ".homierc"
 	ConfFileType = "yaml"
 )

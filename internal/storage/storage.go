@@ -17,6 +17,17 @@ import (
 	"github.com/kaliv0/homie/internal/log"
 )
 
+const (
+	MaxDbConnections = 2
+	ConnMaxLifetime  = 12 * time.Hour
+	DbBusyTimeout    = 5000 // 5s in milliseconds
+	JournalMode      = "WAL"
+	DbSync           = "NORMAL"
+
+	DefaultLimit   = 20
+	DefaultMaxSize = 500
+)
+
 // ClipboardItem represents a clipboard entry persisted in the database.
 type ClipboardItem struct {
 	ID        int       `db:"id"`
@@ -45,15 +56,15 @@ func NewRepository(dbPath string) (*Repository, error) {
 	}
 
 	// set SQLite connection pool settings suited for a single-file DB
-	db.SetMaxOpenConns(config.MaxDbConnections)
-	db.SetMaxIdleConns(config.MaxDbConnections)
-	db.SetConnMaxLifetime(config.ConnMaxLifetime) // TrackingClipboard is a long-running background task
+	db.SetMaxOpenConns(MaxDbConnections)
+	db.SetMaxIdleConns(MaxDbConnections)
+	db.SetConnMaxLifetime(ConnMaxLifetime) // TrackingClipboard is a long-running background task
 
 	// set SQLite pragmas
 	pragmas := []string{
-		fmt.Sprintf(`PRAGMA busy_timeout = %d`, config.DbBusyTimeout),
-		fmt.Sprintf(`PRAGMA journal_mode = %s`, config.JournalMode),
-		fmt.Sprintf(`PRAGMA synchronous = %s`, config.Sync),
+		fmt.Sprintf(`PRAGMA busy_timeout = %d`, DbBusyTimeout),
+		fmt.Sprintf(`PRAGMA journal_mode = %s`, JournalMode),
+		fmt.Sprintf(`PRAGMA synchronous = %s`, DbSync),
 	}
 
 	for _, pragma := range pragmas {
@@ -211,12 +222,12 @@ func CleanOldHistory(db *Repository) error {
 
 	maxSize := viper.GetInt("max_size")
 	if maxSize <= 0 {
-		maxSize = config.DefaultMaxSize
+		maxSize = DefaultMaxSize
 	}
 
 	minLimit := viper.GetInt("limit")
 	if minLimit <= 0 {
-		minLimit = config.DefaultLimit
+		minLimit = DefaultLimit
 	}
 
 	total, err := db.Count()

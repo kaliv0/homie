@@ -59,11 +59,8 @@ var (
 				log.Logger().Println(err)
 			}
 
-			signalCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+			ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 			defer stop()
-
-			ctx, cancel := context.WithTimeout(signalCtx, config.ConnMaxLifetime)
-			defer cancel()
 
 			if err := clipboard.TrackClipboard(ctx, db); err != nil {
 				_ = db.Close()

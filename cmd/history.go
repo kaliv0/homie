@@ -37,7 +37,7 @@ var (
 
 			shouldPaste, err := cmd.Flags().GetBool("paste")
 			if err != nil {
-				log.Logger().Fatal(err)
+				log.Logger().Fatalf("failed to get 'paste' flag: %v", err)
 			}
 
 			// fetch history-to-be-displayed
@@ -63,7 +63,7 @@ var (
 			if goos == "linux" && useXclip {
 				// NB since golang.design/x/clipboard doesn't always
 				// write successfully to the clipboard and supports only x11 (but not Wayland)
-				// we use this custom working-around based on xclip instead
+				// we use this custom workaround based on xclip instead
 				err = clipboard.Write(output)
 				if err != nil {
 					log.Logger().Fatal(err)
@@ -78,7 +78,7 @@ var (
 				}
 			} else {
 				if err := gclip.Init(); err != nil {
-					log.Logger().Fatal(err)
+					log.Logger().Fatalf("failed to initialize clipboard: %v", err)
 				}
 				gclip.Write(gclip.FmtText, []byte(output))
 				text := gclip.Read(gclip.FmtText)
@@ -132,7 +132,7 @@ func init() {
 	)
 
 	if err := viper.BindPFlag("limit", listHistoryCmd.Flags().Lookup("limit")); err != nil {
-		log.Logger().Fatal(err)
+		log.Logger().Fatalf("failed to bind 'limit' flag to viper: %v", err)
 	}
 	viper.SetDefault("use_xclip", true)
 

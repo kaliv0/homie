@@ -18,7 +18,7 @@ $ source <(%s completion | tee -a "$HOME/.bash_completion")`, rootCmd.Root().Nam
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, _ []string) {
 			if err := cmd.Root().GenBashCompletion(os.Stdout); err != nil {
-				log.Logger().Fatal(err)
+				log.Logger().Fatalf("failed to generate bash completion: %v", err)
 			}
 		},
 	}

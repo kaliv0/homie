@@ -1,6 +1,9 @@
 package clipboard
 
-import "os/exec"
+import (
+	"fmt"
+	"os/exec"
+)
 
 type xclip struct {
 	cmd  string
@@ -23,7 +26,7 @@ func Read() (string, error) {
 	cmd := exec.Command(xCopy.cmd, xCopy.args...)
 	out, err := cmd.Output()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to read from clipboard using xclip (cmd=%s %v): %w", xCopy.cmd, xCopy.args, err)
 	}
 	return string(out), nil
 }
@@ -34,23 +37,26 @@ func Write(text string) error {
 
 	in, err := cmd.StdinPipe()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create stdin pipe for xclip write (cmd=%s %v): %w", xPaste.cmd, xPaste.args, err)
 	}
 
 	err = cmd.Start()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to start xclip command for write (cmd=%s %v): %w", xPaste.cmd, xPaste.args, err)
 	}
 
 	_, err = in.Write([]byte(text))
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to write text to xclip stdin (length=%d): %w", len(text), err)
 	}
 
 	err = in.Close()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to close xclip stdin pipe: %w", err)
 	}
 
-	return cmd.Wait()
+	if err = cmd.Wait(); err != nil {
+		return fmt.Errorf("xclip command failed during write: %w", err)
+	}
+	return nil
 }

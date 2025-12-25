@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -15,27 +16,38 @@ const (
 	DefaultLimit   = 20
 	DefaultMaxSize = 500
 
+	// DB configs
 	MaxDbConnections = 2
 	ConnMaxLifetime  = 12 * time.Hour
-
+	// SQLite pragmas
 	DbBusyTimeout = 5000 // 5s in milliseconds
 	JournalMode   = "WAL"
 	Sync          = "NORMAL"
 
-	ConfDirPerm = 0755
+	// FS configs
+	XDGConf     = "XDG_CONFIG_HOME"
+	AppConfPath = "$HOME/"
+	// db
+	DbConfDirPerm = 0755
+	DbConfDirName = ".config"
+	DbSubdirName  = "homie"
+	DbFileName    = "homie.db"
+	// app
+	ConfFileName = ".homierc"
+	ConfFileType = "yaml"
 )
 
 // ReadConfig loads configuration from ~/.homierc once.
 var ReadConfig = sync.OnceValue(readConfig)
 
 func readConfig() error {
-	viper.SetConfigName(".homierc")
-	viper.SetConfigType("yaml")
-	viper.AddConfigPath("$HOME/")
+	viper.SetConfigName(ConfFileName)
+	viper.SetConfigType(ConfFileType)
+	viper.AddConfigPath(AppConfPath)
 	if err := viper.ReadInConfig(); err != nil {
 		var configFileNotFoundError viper.ConfigFileNotFoundError
 		if !errors.As(err, &configFileNotFoundError) {
-			return err
+			return fmt.Errorf("failed to read config file %s from %s: %w", ConfFileName, AppConfPath, err)
 		}
 	}
 	return nil
@@ -51,24 +63,23 @@ var (
 func DBPath() (string, error) {
 	dbPathOnce.Do(func() {
 		var subDirsList []string
-		xdgConfig := os.Getenv("XDG_CONFIG_HOME")
-		if xdgConfig != "" {
-			subDirsList = append(subDirsList, xdgConfig)
+		if xdgConf := os.Getenv(XDGConf); xdgConf != "" {
+			subDirsList = append(subDirsList, xdgConf)
 		} else {
 			homeDir, err := os.UserHomeDir()
 			if err != nil {
-				dbPathErr = err
+				dbPathErr = fmt.Errorf("failed to get user home directory: %w", err)
 				return
 			}
-			subDirsList = append(subDirsList, homeDir, ".config")
+			subDirsList = append(subDirsList, homeDir, DbConfDirName)
 		}
-		subDirsList = append(subDirsList, "homie")
+		subDirsList = append(subDirsList, DbSubdirName)
 		configDir := filepath.Join(subDirsList...)
-		if err := os.MkdirAll(configDir, ConfDirPerm); err != nil {
-			dbPathErr = err
+		if err := os.MkdirAll(configDir, DbConfDirPerm); err != nil {
+			dbPathErr = fmt.Errorf("failed to create config directory %q: %w", configDir, err)
 			return
 		}
-		dbPathVal = filepath.Join(configDir, "homie.db")
+		dbPathVal = filepath.Join(configDir, DbFileName)
 	})
 	return dbPathVal, dbPathErr
 }

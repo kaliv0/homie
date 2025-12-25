@@ -37,7 +37,7 @@ var (
 
 			shouldPaste, err := cmd.Flags().GetBool("paste")
 			if err != nil {
-				log.Logger().Fatal(err)
+				log.Logger().Fatalf("failed to get 'paste' flag: %v", err)
 			}
 
 			// fetch history-to-be-displayed
@@ -78,7 +78,7 @@ var (
 				}
 			} else {
 				if err := gclip.Init(); err != nil {
-					log.Logger().Fatal(err)
+					log.Logger().Fatalf("failed to initialize clipboard: %v", err)
 				}
 				gclip.Write(gclip.FmtText, []byte(output))
 				text := gclip.Read(gclip.FmtText)
@@ -132,7 +132,7 @@ func init() {
 	)
 
 	if err := viper.BindPFlag("limit", listHistoryCmd.Flags().Lookup("limit")); err != nil {
-		log.Logger().Fatal(err)
+		log.Logger().Fatalf("failed to bind 'limit' flag to viper: %v", err)
 	}
 	viper.SetDefault("use_xclip", true)
 

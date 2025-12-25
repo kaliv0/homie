@@ -24,8 +24,9 @@ var (
 			if err := daemon.StopAllInstances(); err != nil {
 				log.Logger().Println(err)
 			}
-			if err := exec.Command(cmd.Root().Name(), "run").Start(); err != nil {
-				log.Logger().Fatal(err)
+			cmdName := cmd.Root().Name()
+			if err := exec.Command(cmdName, "run").Start(); err != nil {
+				log.Logger().Fatalf("failed to start daemon process (command=%q run): %v", cmdName, err)
 			}
 		},
 	}

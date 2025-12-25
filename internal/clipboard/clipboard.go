@@ -2,6 +2,7 @@ package clipboard
 
 import (
 	"context"
+	"fmt"
 
 	gclip "golang.design/x/clipboard"
 
@@ -11,7 +12,7 @@ import (
 // TrackClipboard watches for clipboard text changes and persists them.
 func TrackClipboard(ctx context.Context, db *storage.Repository) error {
 	if err := gclip.Init(); err != nil {
-		return err
+		return fmt.Errorf("failed to initialize clipboard: %w", err)
 	}
 	changes := gclip.Watch(ctx, gclip.FmtText)
 

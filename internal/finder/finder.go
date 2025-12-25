@@ -75,7 +75,8 @@ func handleLoadChannel(ctx context.Context, history *[]storage.ClipboardItem, db
 					currentOffset += limit
 					page, err := db.Read(currentOffset, limit)
 					if err != nil {
-						log.Logger().Println(err)
+						log.Logger().Printf("failed to load more history items (offset=%d, limit=%d, total=%d): %v\n",
+							currentOffset, limit, total, err)
 						continue
 					}
 					if len(page) > 0 {

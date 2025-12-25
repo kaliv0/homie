@@ -35,13 +35,13 @@ func NewRepository(dbPath string) (*Repository, error) {
 	// create db if not exists
 	db, err := sqlx.Connect("sqlite3", dbPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to connect to database at %q: %w", dbPath, err)
 	}
 
 	// verify connection
 	if err = db.Ping(); err != nil {
 		_ = db.Close()
-		return nil, err
+		return nil, fmt.Errorf("failed to ping database at %q: %w", dbPath, err)
 	}
 
 	// set SQLite connection pool settings suited for a single-file DB
@@ -77,14 +77,14 @@ func (r *Repository) AutoMigrate() error {
 		)
 	`)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create clipboard_items table: %w", err)
 	}
 	// Create index on time_stamp for better query performance
 	_, err = r.db.Exec(`
 		CREATE INDEX IF NOT EXISTS idx_time_stamp ON clipboard_items(time_stamp)
 	`)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create index idx_time_stamp on clipboard_items: %w", err)
 	}
 	return nil
 }
@@ -99,7 +99,7 @@ func (r *Repository) Read(offset, limit int) ([]ClipboardItem, error) {
 		LIMIT ? OFFSET ?
 	`, limit, offset)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read clipboard items (offset=%d, limit=%d): %w", offset, limit, err)
 	}
 	return items, nil
 }
@@ -108,7 +108,7 @@ func (r *Repository) Read(offset, limit int) ([]ClipboardItem, error) {
 func (r *Repository) Write(item []byte) error {
 	hasher := sha256.New()
 	if _, err := hasher.Write(item); err != nil {
-		return err
+		return fmt.Errorf("failed to hash clipboard item (length=%d): %w", len(item), err)
 	}
 	textHash := hex.EncodeToString(hasher.Sum(nil))
 
@@ -124,9 +124,12 @@ func (r *Repository) Write(item []byte) error {
 			INSERT INTO clipboard_items (clip_text, text_hash, time_stamp) 
 			VALUES (?, ?, ?)
 		`, string(item), textHash, time.Now())
-		return err
+		if err != nil {
+			return fmt.Errorf("failed to insert clipboard item (hash=%s, length=%d): %w", textHash, len(item), err)
+		}
+		return nil
 	} else if err != nil {
-		return err
+		return fmt.Errorf("failed to check for existing clipboard item (hash=%s): %w", textHash, err)
 	}
 
 	_, err = r.db.Exec(`
@@ -134,7 +137,10 @@ func (r *Repository) Write(item []byte) error {
 		SET time_stamp = ? 
 		WHERE id = ?
 	`, time.Now(), existingItem.ID)
-	return err
+	if err != nil {
+		return fmt.Errorf("failed to update timestamp for clipboard item (id=%d, hash=%s): %w", existingItem.ID, textHash, err)
+	}
+	return nil
 }
 
 // DeleteExcess removes the oldest records.
@@ -147,7 +153,10 @@ func (r *Repository) DeleteExcess(deleteCount int) error {
 			LIMIT ?
 		)
 	`, deleteCount)
-	return err
+	if err != nil {
+		return fmt.Errorf("failed to delete excess clipboard items (count=%d): %w", deleteCount, err)
+	}
+	return nil
 }
 
 // DeleteOldest removes records older than the given TTL.
@@ -156,7 +165,10 @@ func (r *Repository) DeleteOldest(ttl int) error {
 		DELETE FROM clipboard_items
 		WHERE time_stamp < datetime('now', concat(?, ' days'), 'localtime')
 	`, "-"+strconv.Itoa(ttl))
-	return err
+	if err != nil {
+		return fmt.Errorf("failed to delete oldest clipboard items (ttl=%d days): %w", ttl, err)
+	}
+	return nil
 }
 
 // Count returns the total number of records.
@@ -164,7 +176,7 @@ func (r *Repository) Count() (int, error) {
 	var count int
 	err := r.db.Get(&count, `SELECT COUNT(*) FROM clipboard_items`)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to count clipboard items: %w", err)
 	}
 	return count, nil
 }
@@ -172,7 +184,10 @@ func (r *Repository) Count() (int, error) {
 // Reset deletes all records.
 func (r *Repository) Reset() error {
 	_, err := r.db.Exec(`DELETE FROM clipboard_items`)
-	return err
+	if err != nil {
+		return fmt.Errorf("failed to reset clipboard history: %w", err)
+	}
+	return nil
 }
 
 // Close releases the database connection.
@@ -215,7 +230,9 @@ func CleanOldHistory(db *Repository) error {
 		}
 
 		if deleteCount := total - minLimit; deleteCount > 0 {
-			return db.DeleteExcess(deleteCount)
+			if err = db.DeleteExcess(deleteCount); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

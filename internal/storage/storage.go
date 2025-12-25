@@ -18,14 +18,14 @@ import (
 )
 
 const (
-	MaxDbConnections = 2
-	ConnMaxLifetime  = 12 * time.Hour
-	DbBusyTimeout    = 5000 // 5s in milliseconds
-	JournalMode      = "WAL"
-	DbSync           = "NORMAL"
-
 	DefaultLimit   = 20
 	DefaultMaxSize = 500
+
+	maxDbConnections = 2
+	connMaxLifetime  = 12 * time.Hour
+	dbBusyTimeout    = 5000 // 5s in milliseconds
+	journalMode      = "WAL"
+	dbSync           = "NORMAL"
 )
 
 // ClipboardItem represents a clipboard entry persisted in the database.
@@ -56,15 +56,15 @@ func NewRepository(dbPath string) (*Repository, error) {
 	}
 
 	// set SQLite connection pool settings suited for a single-file DB
-	db.SetMaxOpenConns(MaxDbConnections)
-	db.SetMaxIdleConns(MaxDbConnections)
-	db.SetConnMaxLifetime(ConnMaxLifetime) // TrackingClipboard is a long-running background task
+	db.SetMaxOpenConns(maxDbConnections)
+	db.SetMaxIdleConns(maxDbConnections)
+	db.SetConnMaxLifetime(connMaxLifetime) // TrackingClipboard is a long-running background task
 
 	// set SQLite pragmas
 	pragmas := []string{
-		fmt.Sprintf(`PRAGMA busy_timeout = %d`, DbBusyTimeout),
-		fmt.Sprintf(`PRAGMA journal_mode = %s`, JournalMode),
-		fmt.Sprintf(`PRAGMA synchronous = %s`, DbSync),
+		fmt.Sprintf(`PRAGMA busy_timeout = %d`, dbBusyTimeout),
+		fmt.Sprintf(`PRAGMA journal_mode = %s`, journalMode),
+		fmt.Sprintf(`PRAGMA synchronous = %s`, dbSync),
 	}
 
 	for _, pragma := range pragmas {

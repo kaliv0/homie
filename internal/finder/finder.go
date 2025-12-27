@@ -43,6 +43,8 @@ func ListHistory(dbPath string, limit int) (string, error) {
 	defer cancel()
 
 	loadMore := handleLoadChannel(ctx, &history, db, offset, limit, total)
+	defer close(loadMore)
+
 	idxs, err := findItemIdxs(&history, loadMore)
 	if err != nil {
 		return "", err
@@ -94,7 +96,6 @@ func handleLoadChannel(ctx context.Context, history *[]storage.ClipboardItem, db
 }
 
 func findItemIdxs(history *[]storage.ClipboardItem, loadMore chan struct{}) ([]int, error) {
-	defer close(loadMore)
 	idxs, err := fuzzyfinder.FindMulti(
 		history,
 		// itemFunc -> returns items in main history list

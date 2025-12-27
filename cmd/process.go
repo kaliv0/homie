@@ -24,9 +24,14 @@ var (
 			if err := daemon.StopAllInstances(); err != nil {
 				log.Logger().Println(err)
 			}
+
 			cmdName := cmd.Root().Name()
-			if err := exec.Command(cmdName, "run").Start(); err != nil {
+			daemonCmd := exec.Command(cmdName, "run")
+			if err := daemonCmd.Start(); err != nil {
 				log.Logger().Fatalf("failed to start daemon process (command=%q run): %v", cmdName, err)
+			}
+			if err := daemonCmd.Process.Release(); err != nil {
+				log.Logger().Printf("failed to release daemon process: %v\n", err)
 			}
 		},
 	}

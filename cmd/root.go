@@ -37,6 +37,7 @@ var rootCmd = &cobra.Command{
 		⠻⠿⢿⣿⣿⣿⣿⠏⠉⠉⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠢⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 `}
 
+// Execute runs the root cobra command.
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)

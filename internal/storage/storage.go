@@ -133,14 +133,15 @@ func (r *Repository) Write(item []byte) error {
 
 	if errors.Is(err, sql.ErrNoRows) {
 		_, err = r.db.Exec(`
-			INSERT INTO clipboard_items (clip_text, text_hash, time_stamp) 
+			INSERT INTO clipboard_items (clip_text, text_hash, time_stamp)
 			VALUES (?, ?, ?)
 		`, string(item), textHash, time.Now())
 		if err != nil {
 			return fmt.Errorf("failed to insert clipboard item (hash=%s, length=%d): %w", textHash, len(item), err)
 		}
 		return nil
-	} else if err != nil {
+	}
+	if err != nil {
 		return fmt.Errorf("failed to check for existing clipboard item (hash=%s): %w", textHash, err)
 	}
 
@@ -236,16 +237,8 @@ func CleanOldHistory(db *Repository) error {
 		return err
 	}
 
-	if total > maxSize {
-		if minLimit >= total {
-			return nil
-		}
-
-		if deleteCount := total - minLimit; deleteCount > 0 {
-			if err = db.DeleteExcess(deleteCount); err != nil {
-				return err
-			}
-		}
+	if total <= maxSize || minLimit >= total {
+		return nil
 	}
-	return nil
+	return db.DeleteExcess(total - minLimit)
 }

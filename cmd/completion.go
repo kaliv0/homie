@@ -14,7 +14,7 @@ var (
 		Use:   "completion",
 		Short: "Generate completion script",
 		Long: fmt.Sprintf(`To load completions execute:
-$ source <(%s completion | tee -a "$HOME/.bash_completion")`, rootCmd.Root().Name()),
+$ source <(homie completion | tee -a "$HOME/.bash_completion")`),
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, _ []string) {
 			if err := cmd.Root().GenBashCompletion(os.Stdout); err != nil {

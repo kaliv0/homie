@@ -152,7 +152,7 @@ func pasteToTmuxPane(text, paneID string) error {
 	pasteBuf := exec.Command("tmux", "paste-buffer", "-t", paneID, "-dp")
 	if err := pasteBuf.Run(); err != nil {
 		_ = exec.Command("tmux", "delete-buffer").Run()
-		return fmt.Errorf("failed to paste to tmux pane: %w", err)
+		return fmt.Errorf("failed to paste to tmux pane %q: %w", paneID, err)
 	}
 	return nil
 }

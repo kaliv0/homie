@@ -75,6 +75,24 @@ $ homie completion
 
 Generates a shell configuration for the `.bash_completion` file that will enable auto_complete for all <i>homie</i> commands<br>
 
+```shell
+$ homie tmux
+```
+
+Generates a tmux integration script. Append it to your `.tmux.conf`:
+```shell
+$ homie tmux >> "$HOME/.tmux.conf"
+```
+Then reload from inside a running tmux session:
+```shell
+$ tmux source-file "$HOME/.tmux.conf"
+```
+
+Requires tmux 3.2+ (for `display-popup` support).<br>
+Key bindings:
+- <i>prefix + h</i> - opens clipboard history popup (copies selection to system clipboard)
+- <i>prefix + p</i> - opens clipboard history popup and pastes selection into the active pane
+
 ---
 
 When you start <i>homie</i> it will automatically stop other running instances of the application if any.<br>
@@ -89,7 +107,7 @@ After that it will scan the database and if there are records above certain limi
 
 ## Known limitations
 
-Currently <i>homie</i> is designed only for `bash`, it doesn't work with `tmux` yet (although it's fairly easy to implement).<br>
+Currently <i>homie</i> is designed only for `bash` and `tmux`.<br>
 
 <p align="center">
   <img src="https://github.com/kaliv0/homie/blob/main/assets/doh.gif?raw=true" width="300" alt="D'OH">

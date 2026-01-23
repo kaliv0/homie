@@ -2,8 +2,10 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -53,39 +55,19 @@ var (
 				return
 			}
 
-			// put output inside clipboard
-			goos := runtime.GOOS
-			useXclip := viper.GetBool("use_xclip")
-			if _, err := exec.LookPath("xclip"); err != nil {
-				log.Logger().Println("xclip not found, falling back to \"golang.design/x/clipboard\"")
-				useXclip = false
+			writeToClipboard(output)
+			if !shouldPaste {
+				return
 			}
-			if goos == "linux" && useXclip {
-				// NB since golang.design/x/clipboard doesn't always
-				// write successfully to the clipboard and supports only x11 (but not Wayland)
-				// we use this custom workaround based on xclip instead
-				err = clipboard.Write(output)
-				if err != nil {
-					log.Logger().Fatal(err)
-				}
 
-				text, err := clipboard.Read()
-				if err != nil {
+			targetPane := os.Getenv("HOMIE_TARGET_PANE")
+			if targetPane != "" {
+				if err := pasteToTmuxPane(output, targetPane); err != nil {
 					log.Logger().Fatal(err)
 				}
-				if shouldPaste {
-					fmt.Print(text)
-				}
-			} else {
-				if err := gclip.Init(); err != nil {
-					log.Logger().Fatalf("failed to initialize clipboard: %v", err)
-				}
-				gclip.Write(gclip.FmtText, []byte(output))
-				text := gclip.Read(gclip.FmtText)
-				if shouldPaste {
-					fmt.Print(string(text))
-				}
+				return
 			}
+			fmt.Print(output)
 		},
 	}
 
@@ -138,4 +120,39 @@ func init() {
 
 	rootCmd.AddCommand(listHistoryCmd)
 	rootCmd.AddCommand(clearHistoryCmd)
+}
+
+func writeToClipboard(text string) {
+	useXclip := viper.GetBool("use_xclip")
+	if _, err := exec.LookPath("xclip"); err != nil {
+		log.Logger().Println("xclip not found, falling back to \"golang.design/x/clipboard\"")
+		useXclip = false
+	}
+
+	if runtime.GOOS == "linux" && useXclip {
+		if err := clipboard.Write(text); err != nil {
+			log.Logger().Fatal(err)
+		}
+		return
+	}
+
+	if err := gclip.Init(); err != nil {
+		log.Logger().Fatalf("failed to initialize clipboard: %v", err)
+	}
+	gclip.Write(gclip.FmtText, []byte(text))
+}
+
+func pasteToTmuxPane(text, paneID string) error {
+	loadBuf := exec.Command("tmux", "load-buffer", "-")
+	loadBuf.Stdin = strings.NewReader(text)
+	if err := loadBuf.Run(); err != nil {
+		return fmt.Errorf("failed to load tmux buffer: %w", err)
+	}
+
+	pasteBuf := exec.Command("tmux", "paste-buffer", "-t", paneID, "-dp")
+	if err := pasteBuf.Run(); err != nil {
+		_ = exec.Command("tmux", "delete-buffer").Run()
+		return fmt.Errorf("failed to paste to tmux pane: %w", err)
+	}
+	return nil
 }

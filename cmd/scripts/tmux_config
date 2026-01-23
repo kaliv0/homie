@@ -1,0 +1,8 @@
+###  Homie tmux config  ###
+run-shell "homie start"
+
+# Open clipboard history (copies selection to system clipboard)
+bind-key h display-popup -E "homie history"
+
+# Open clipboard history and paste into active pane
+bind-key p display-popup -E "HOMIE_TARGET_PANE='#{pane_id}' homie history --paste"

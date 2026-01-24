@@ -25,29 +25,11 @@ var (
 		Long: `List clipboard history
   Use <tab> to pin and select multiple entries`,
 		Run: func(cmd *cobra.Command, _ []string) {
-			// read flags
 			if err := config.ReadConfig(); err != nil {
 				log.Logger().Println(err)
 			}
 
-			// limit is read in order:
-			//'--limit <n>' cli flag -> .homierc  -> Flags().IntP() default val
-			limit := viper.GetInt("limit")
-			if limit <= 0 {
-				limit = storage.DefaultLimit
-			}
-
-			shouldPaste, err := cmd.Flags().GetBool("paste")
-			if err != nil {
-				log.Logger().Fatalf("failed to get 'paste' flag: %v", err)
-			}
-
-			// fetch history-to-be-displayed
-			dbPath, err := config.DBPath()
-			if err != nil {
-				log.Logger().Fatal(err)
-			}
-			output, err := finder.ListHistory(dbPath, limit)
+			output, err := fetchDisplayHistory()
 			if err != nil {
 				log.Logger().Fatal(err)
 			}
@@ -55,19 +37,20 @@ var (
 				return
 			}
 
-			writeToClipboard(output)
+			if err = writeToClipboard(output); err != nil {
+				log.Logger().Fatal(err)
+			}
+
+			shouldPaste, err := cmd.Flags().GetBool("paste")
+			if err != nil {
+				log.Logger().Fatalf("failed to get 'paste' flag: %v", err)
+			}
 			if !shouldPaste {
 				return
 			}
-
-			targetPane := os.Getenv("HOMIE_TARGET_PANE")
-			if targetPane != "" {
-				if err := pasteToTmuxPane(output, targetPane); err != nil {
-					log.Logger().Fatal(err)
-				}
-				return
+			if err := pasteText(output); err != nil {
+				log.Logger().Fatal(err)
 			}
-			fmt.Print(output)
 		},
 	}
 
@@ -99,6 +82,61 @@ var (
 	}
 )
 
+func fetchDisplayHistory() (string, error) {
+	// limit is read in order:
+	//'--limit <n>' cli flag -> .homierc  -> Flags().IntP() default val
+	limit := viper.GetInt("limit")
+	if limit <= 0 {
+		limit = storage.DefaultLimit
+	}
+
+	dbPath, err := config.DBPath()
+	if err != nil {
+		return "", err
+	}
+	return finder.ListHistory(dbPath, limit)
+}
+
+func writeToClipboard(text string) error {
+	useXclip := viper.GetBool("use_xclip")
+	if _, err := exec.LookPath("xclip"); err != nil {
+		log.Logger().Println("xclip not found, falling back to \"golang.design/x/clipboard\"")
+		useXclip = false
+	}
+
+	if runtime.GOOS == "linux" && useXclip {
+		return clipboard.Write(text)
+	}
+
+	if err := gclip.Init(); err != nil {
+		return fmt.Errorf("failed to initialize clipboard: %w", err)
+	}
+	gclip.Write(gclip.FmtText, []byte(text))
+	return nil
+}
+
+func pasteText(text string) error {
+	targetPane := os.Getenv("HOMIE_TARGET_PANE")
+	if targetPane == "" {
+		fmt.Print(text)
+		return nil
+	}
+
+	// paste inside tmux
+	loadBuf := exec.Command("tmux", "load-buffer", "-")
+	loadBuf.Stdin = strings.NewReader(text)
+	if err := loadBuf.Run(); err != nil {
+		return fmt.Errorf("failed to load tmux buffer: %w", err)
+	}
+
+	pasteBuf := exec.Command("tmux", "paste-buffer", "-t", targetPane, "-dp")
+	if err := pasteBuf.Run(); err != nil {
+		_ = exec.Command("tmux", "delete-buffer").Run()
+		return fmt.Errorf("failed to paste to tmux pane %q: %w", targetPane, err)
+	}
+	return nil
+}
+
 func init() {
 	listHistoryCmd.Flags().IntP(
 		"limit",
@@ -120,39 +158,4 @@ func init() {
 
 	rootCmd.AddCommand(listHistoryCmd)
 	rootCmd.AddCommand(clearHistoryCmd)
-}
-
-func writeToClipboard(text string) {
-	useXclip := viper.GetBool("use_xclip")
-	if _, err := exec.LookPath("xclip"); err != nil {
-		log.Logger().Println("xclip not found, falling back to \"golang.design/x/clipboard\"")
-		useXclip = false
-	}
-
-	if runtime.GOOS == "linux" && useXclip {
-		if err := clipboard.Write(text); err != nil {
-			log.Logger().Fatal(err)
-		}
-		return
-	}
-
-	if err := gclip.Init(); err != nil {
-		log.Logger().Fatalf("failed to initialize clipboard: %v", err)
-	}
-	gclip.Write(gclip.FmtText, []byte(text))
-}
-
-func pasteToTmuxPane(text, paneID string) error {
-	loadBuf := exec.Command("tmux", "load-buffer", "-")
-	loadBuf.Stdin = strings.NewReader(text)
-	if err := loadBuf.Run(); err != nil {
-		return fmt.Errorf("failed to load tmux buffer: %w", err)
-	}
-
-	pasteBuf := exec.Command("tmux", "paste-buffer", "-t", paneID, "-dp")
-	if err := pasteBuf.Run(); err != nil {
-		_ = exec.Command("tmux", "delete-buffer").Run()
-		return fmt.Errorf("failed to paste to tmux pane %q: %w", paneID, err)
-	}
-	return nil
 }

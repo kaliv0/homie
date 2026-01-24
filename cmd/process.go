@@ -27,6 +27,7 @@ var (
 
 			cmdName := cmd.Root().Name()
 			daemonCmd := exec.Command(cmdName, "run")
+			daemonCmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 			if err := daemonCmd.Start(); err != nil {
 				log.Logger().Fatalf("failed to start daemon process (command=%q run): %v", cmdName, err)
 			}
@@ -64,6 +65,8 @@ var (
 				log.Logger().Println(err)
 			}
 
+			// Ignore SIGHUP so the daemon survives terminal/session closure (e.g. tmux exit)
+			signal.Ignore(syscall.SIGHUP)
 			ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 			defer stop()
 

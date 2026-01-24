@@ -42,8 +42,14 @@ func ListHistory(dbPath string, limit int) (string, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	loadMore := handleLoadChannel(ctx, &history, db, offset, limit, total)
-	defer close(loadMore)
+	// Wait for the pagination goroutine to finish before db.Close() runs,
+	// so an in-flight db.Read() isn't interrupted by a closed connection.
+	var wg sync.WaitGroup
+	loadMore := handleLoadChannel(ctx, &history, db, offset, limit, total, &wg)
+	defer func() {
+		close(loadMore)
+		wg.Wait()
+	}()
 
 	idxs, err := findItemIdxs(&history, loadMore)
 	if err != nil {
@@ -62,10 +68,12 @@ func ListHistory(dbPath string, limit int) (string, error) {
 	return strings.Join(out, " "), nil
 }
 
-func handleLoadChannel(ctx context.Context, history *[]storage.ClipboardItem, db *storage.Repository, offset, limit, total int) chan struct{} {
+func handleLoadChannel(ctx context.Context, history *[]storage.ClipboardItem, db *storage.Repository, offset, limit, total int, wg *sync.WaitGroup) chan struct{} {
 	// signal more items needed -> triggered from fuzzyfinder.WithPreviewWindow
 	loadMore := make(chan struct{}, 1)
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		currentOffset := offset
 		for {
 			select {

@@ -12,6 +12,13 @@ import (
 	"github.com/kaliv0/homie/internal/storage"
 )
 
+// HistoryReader provides paginated access to clipboard history.
+type HistoryReader interface {
+	Read(offset, limit int) ([]storage.ClipboardItem, error)
+	Count() (int, error)
+	Close() error
+}
+
 var mu sync.RWMutex
 
 // ListHistory loads clipboard history and presents a fuzzy finder.
@@ -68,7 +75,8 @@ func ListHistory(dbPath string, limit int) (string, error) {
 	return strings.Join(out, " "), nil
 }
 
-func handleLoadChannel(ctx context.Context, history *[]storage.ClipboardItem, db *storage.Repository, offset, limit, total int, wg *sync.WaitGroup) chan struct{} {
+func handleLoadChannel(ctx context.Context, history *[]storage.ClipboardItem, db HistoryReader,
+	offset, limit, total int, wg *sync.WaitGroup) chan struct{} {
 	// signal more items needed -> triggered from fuzzyfinder.WithPreviewWindow
 	loadMore := make(chan struct{}, 1)
 	wg.Add(1)

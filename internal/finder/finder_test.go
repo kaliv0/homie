@@ -34,7 +34,7 @@ func (m *mockReader) Close() error {
 	return nil
 }
 
-// countingMockReader wraps a mockReader and counts Read calls.
+// countingMockReader counts Read calls.
 type countingMockReader struct {
 	reader    *mockReader
 	callCount int
@@ -53,16 +53,16 @@ func (c *countingMockReader) Close() error {
 	return nil
 }
 
-// loadChannelFixture holds common test state for handleLoadChannel tests.
+// loadChannelFixture is shared test state.
 type loadChannelFixture struct {
 	history  []storage.ClipboardItem
 	wg       sync.WaitGroup
 	loadMore chan struct{}
 }
 
-// newLoadChannelFixture creates a fixture, starts the load channel goroutine,
-// and registers cleanup. Uses t.Context() which is cancelled when the test ends.
-func newLoadChannelFixture(t *testing.T, reader HistoryReader, initHistory []storage.ClipboardItem, offset, limit, total int) *loadChannelFixture {
+// newLoadChannelFixture creates a fixture and starts the load channel goroutine.
+func newLoadChannelFixture(t *testing.T, reader HistoryReader, initHistory []storage.ClipboardItem,
+	offset, limit, total int) *loadChannelFixture {
 	t.Helper()
 	ctx := t.Context()
 
@@ -78,13 +78,13 @@ func newLoadChannelFixture(t *testing.T, reader HistoryReader, initHistory []sto
 	return f
 }
 
-// triggerLoad sends a load signal and waits for it to be processed.
+// triggerLoad sends a load signal.
 func (f *loadChannelFixture) triggerLoad() {
 	f.loadMore <- struct{}{}
 	time.Sleep(50 * time.Millisecond)
 }
 
-// historyLen returns the current history length (thread-safe).
+// historyLen returns the current history length.
 func (f *loadChannelFixture) historyLen() int {
 	mu.RLock()
 	defer mu.RUnlock()

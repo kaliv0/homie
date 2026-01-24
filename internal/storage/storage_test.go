@@ -23,7 +23,7 @@ func setupTestDB(t *testing.T) *Repository {
 	if err := repo.AutoMigrate(); err != nil {
 		t.Fatalf("AutoMigrate() failed: %v", err)
 	}
-	t.Cleanup(func() { repo.Close() })
+	t.Cleanup(func() { _ = repo.Close() })
 	return repo
 }
 
@@ -84,7 +84,9 @@ func TestNewRepository(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	defer repo.Close()
+	defer func() {
+		_ = repo.Close()
+	}()
 
 	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
 		t.Fatalf("expected database file to be created at %q", dbPath)

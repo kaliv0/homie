@@ -17,7 +17,7 @@ Supports <i>fuzzy search</i>, <i>multi-select</i> and other adorable <i>chicaner
 ```shell
 $ go install github.com/kaliv0/homie@latest
 ```
-On `Linux` you would also need `xclip` installed as an external dependency
+On `linux` you would also need `xclip` installed as an external dependency
 
 ---
 
@@ -79,19 +79,7 @@ Generates a shell configuration for the `.bash_completion` file that will enable
 $ homie tmux
 ```
 
-Generates a tmux integration script. Append it to your `.tmux.conf`:
-```shell
-$ homie tmux >> "$HOME/.tmux.conf"
-```
-Then reload from inside a running tmux session:
-```shell
-$ tmux source-file "$HOME/.tmux.conf"
-```
-
-Requires tmux 3.2+ (for `display-popup` support).<br>
-Key bindings:
-- <i>prefix + h</i> - opens clipboard history popup (copies selection to system clipboard)
-- <i>prefix + p</i> - opens clipboard history popup and pastes selection into the active pane
+Generates a tmux integration script for your `.tmux.conf`. Requires tmux 3.2+ (for `display-popup` support).<br>
 
 ---
 
@@ -105,9 +93,17 @@ After that it will scan the database and if there are records above certain limi
 
 ---
 
+<b>Key bindings</b>:
+- <i>Ctrl + h</i> (<i>prefix + h</i> if inside a tmux session) - opens clipboard history popup (copies selection to system clipboard)
+- <i>Ctrl + p</i> (<i>prefix + p</i>) - opens clipboard history popup and pastes selected item
+
+You can tweak and customize those in your `.bashrc` and `.tmux.conf` files.
+
+---
+
 ## Known limitations
 
-Currently <i>homie</i> is designed only for `bash` and `tmux`.<br>
+Currently <i>homie</i> is designed for `bash` and `tmux` and tested only on `linux`.<br>
 
 <p align="center">
   <img src="https://github.com/kaliv0/homie/blob/main/assets/doh.gif?raw=true" width="300" alt="D'OH">

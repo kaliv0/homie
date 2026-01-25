@@ -151,7 +151,8 @@ func (r *Repository) Write(item []byte) error {
 		WHERE id = ?
 	`, time.Now(), existingItem.ID)
 	if err != nil {
-		return fmt.Errorf("failed to update timestamp for clipboard item (id=%d, hash=%s): %w", existingItem.ID, textHash, err)
+		return fmt.Errorf("failed to update timestamp for clipboard item (id=%d, hash=%s): %w",
+			existingItem.ID, textHash, err)
 	}
 	return nil
 }

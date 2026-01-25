@@ -2,11 +2,13 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"os/exec"
 	"os/signal"
 	"syscall"
 
 	"github.com/spf13/cobra"
+	gclip "golang.design/x/clipboard"
 
 	"github.com/kaliv0/homie/internal/clipboard"
 	"github.com/kaliv0/homie/internal/config"
@@ -21,7 +23,7 @@ var (
 		Short:                 "Start clipboard manager",
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, _ []string) {
-			if err := daemon.StopAllInstances(); err != nil {
+			if err := daemon.StopAll(); err != nil {
 				log.Logger().Println(err)
 			}
 
@@ -70,7 +72,11 @@ var (
 			ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 			defer stop()
 
-			if err := clipboard.TrackClipboard(ctx, db); err != nil {
+			if err := gclip.Init(); err != nil {
+				_ = db.Close()
+				log.Logger().Fatal(fmt.Errorf("failed to initialize clipboard: %w", err))
+			}
+			if err := clipboard.TrackClipboard(ctx, db, gclip.Watch(ctx, gclip.FmtText)); err != nil {
 				_ = db.Close()
 				log.Logger().Fatal(err)
 			}
@@ -82,7 +88,7 @@ var (
 		Short:                 "Stop clipboard manager",
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, _ []string) {
-			if err := daemon.StopAllInstances(); err != nil {
+			if err := daemon.StopAll(); err != nil {
 				log.Logger().Fatal(err)
 			}
 		},

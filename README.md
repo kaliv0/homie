@@ -2,7 +2,9 @@
   <img src="https://github.com/kaliv0/homie/blob/main/assets/homie.jpg?raw=true" width="300" alt="Homie">
 </p>
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/kaliv0/homie.svg)](https://pkg.go.dev/github.com/kaliv0/homie)
+<a href="https://github.com/kaliv0/homie/releases"><img src="https://img.shields.io/github/release/kaliv0/homie.svg" alt="Latest Release"></a>
+<a href="https://pkg.go.dev/github.com/kaliv0/homie"><img src="https://pkg.go.dev/badge/github.com/kaliv0/homie.svg"></a>
+<a href="https://github.com/kaliv0/homie/actions"><img src="https://github.com/kaliv0/homie/actions/workflows/build.yml/badge.svg?branch=main" alt="Build Status"></a>
 
 # Homie
 

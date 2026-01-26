@@ -19,6 +19,8 @@ type HistoryReader interface {
 	Close() error
 }
 
+const prompt = "D'OH >> "
+
 var mu sync.RWMutex
 
 // ListHistory loads clipboard history and presents a fuzzy finder.
@@ -133,6 +135,7 @@ func findItemIdxs(history *[]storage.ClipboardItem, loadMore chan struct{}) ([]i
 		}),
 		// reloads passed history slice automatically when items appended
 		fuzzyfinder.WithHotReloadLock(mu.RLocker()),
+		fuzzyfinder.WithPromptString(prompt),
 	)
 	if err != nil && !errors.Is(err, fuzzyfinder.ErrAbort) {
 		return nil, err

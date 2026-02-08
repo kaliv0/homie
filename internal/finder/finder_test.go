@@ -81,7 +81,7 @@ func newLoadChannelFixture(t *testing.T, reader HistoryReader, initHistory []sto
 // triggerLoad sends a load signal.
 func (f *loadChannelFixture) triggerLoad() {
 	f.loadMore <- struct{}{}
-	time.Sleep(50 * time.Millisecond)
+	time.Sleep(5 * time.Millisecond)
 }
 
 // historyLen returns the current history length.
@@ -286,7 +286,7 @@ func TestHandleLoadChannel_RapidSignals(t *testing.T) {
 		default:
 		}
 	}
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(5 * time.Millisecond)
 
 	if n := f.historyLen(); n < 2 {
 		t.Errorf("expected at least 2 items after rapid signals, got %d", n)

@@ -19,7 +19,7 @@ Supports <i>fuzzy search</i>, <i>multi-select</i> and other adorable <i>chicaner
 ```shell
 $ go install github.com/kaliv0/homie@latest
 ```
-On `linux` you would also need `xclip` installed as an external dependency
+On `linux` you would also need `xclip` or `xsel` installed as an external dependency
 
 ---
 
@@ -105,7 +105,7 @@ You can tweak and customize those in your `.bashrc` and `.tmux.conf` files.
 
 ## Known limitations
 
-Currently <i>homie</i> is designed for `bash` and `tmux` and tested only on `linux`.<br>
+Currently <i>homie</i> is designed for `bash` and `tmux` only.<br>
 
 <p align="center">
   <img src="https://github.com/kaliv0/homie/blob/main/assets/doh.gif?raw=true" width="300" alt="D'OH">

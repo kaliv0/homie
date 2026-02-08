@@ -5,58 +5,49 @@ import (
 	"os/exec"
 )
 
-type xclip struct {
-	cmd  string
-	args []string
-}
-
-var (
-	xCopy = xclip{
-		cmd:  "xclip",
-		args: []string{"-out", "-selection", "clipboard"},
+// Write writes a given string to the clipboard using the specified tool.
+func Write(text, tool string) error {
+	var cmdName string
+	var args []string
+	switch tool {
+	case "xclip":
+		// although tool and cmdName point to the same string value, we keep them separated (loosely coupled)
+		cmdName, args = "xclip", []string{"-in", "-selection", "clipboard"}
+	case "xsel":
+		cmdName, args = "xsel", []string{"--input", "--clipboard"}
+	default:
+		return fmt.Errorf("unsupported clipboard tool: %q", tool)
 	}
-	xPaste = xclip{
-		cmd:  "xclip",
-		args: []string{"-in", "-selection", "clipboard"},
-	}
-)
 
-// Read reads whatever is in the clipboard, and returns it as a string.
-func Read() (string, error) {
-	cmd := exec.Command(xCopy.cmd, xCopy.args...)
-	out, err := cmd.Output()
-	if err != nil {
-		return "", fmt.Errorf("failed to read from clipboard using xclip (cmd=%s %v): %w", xCopy.cmd, xCopy.args, err)
-	}
-	return string(out), nil
-}
-
-// Write writes a given string to the clipboard
-func Write(text string) error {
-	cmd := exec.Command(xPaste.cmd, xPaste.args...)
+	cmd := exec.Command(cmdName, args...)
 
 	in, err := cmd.StdinPipe()
 	if err != nil {
-		return fmt.Errorf("failed to create stdin pipe for xclip write (cmd=%s %v): %w", xPaste.cmd, xPaste.args, err)
+		return fmt.Errorf("failed to create stdin pipe for clip write (cmd=%s %v): %w", cmdName, args, err)
 	}
 
-	err = cmd.Start()
-	if err != nil {
-		return fmt.Errorf("failed to start xclip command for write (cmd=%s %v): %w", xPaste.cmd, xPaste.args, err)
+	if err = cmd.Start(); err != nil {
+		_ = in.Close()
+		return fmt.Errorf("failed to start clip command for write (cmd=%s %v): %w", cmdName, args, err)
 	}
 
-	_, err = in.Write([]byte(text))
-	if err != nil {
-		return fmt.Errorf("failed to write text to xclip stdin (length=%d): %w", len(text), err)
+	// close pipe before reaping subprocess to avoid deadlock
+	// waiting for stdin to close (e.g. if in.Write fails mid-way)
+	defer func() {
+		_ = in.Close()
+		_ = cmd.Wait()
+	}()
+
+	if _, err = in.Write([]byte(text)); err != nil {
+		return fmt.Errorf("failed to write text to clip stdin (length=%d): %w", len(text), err)
 	}
 
-	err = in.Close()
-	if err != nil {
-		return fmt.Errorf("failed to close xclip stdin pipe: %w", err)
+	if err = in.Close(); err != nil {
+		return fmt.Errorf("failed to close clip stdin pipe: %w", err)
 	}
 
 	if err = cmd.Wait(); err != nil {
-		return fmt.Errorf("xclip command failed during write: %w", err)
+		return fmt.Errorf("clip command failed during write: %w", err)
 	}
 	return nil
 }

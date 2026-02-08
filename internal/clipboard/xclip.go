@@ -25,16 +25,16 @@ func Write(text, tool string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create stdin pipe for clip write (cmd=%s %v): %w", cmdName, args, err)
 	}
-	// ensure pipe is closed on all exit paths
-	defer func() {
-		_ = in.Close()
-	}()
 
 	if err = cmd.Start(); err != nil {
+		_ = in.Close()
 		return fmt.Errorf("failed to start clip command for write (cmd=%s %v): %w", cmdName, args, err)
 	}
-	// ensure subprocess is reaped on all exit paths
+
+	// close pipe before reaping subprocess to avoid deadlock
+	// waiting for stdin to close (e.g. if in.Write fails mid-way)
 	defer func() {
+		_ = in.Close()
 		_ = cmd.Wait()
 	}()
 

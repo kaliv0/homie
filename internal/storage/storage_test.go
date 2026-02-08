@@ -7,8 +7,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/spf13/viper"
 )
 
 func setupTestDB(t *testing.T) *Repository {
@@ -66,16 +64,6 @@ func assertCount(t *testing.T, repo *Repository, expected int) {
 	if count != expected {
 		t.Errorf("expected count=%d, got %d", expected, count)
 	}
-}
-
-// setCleanupConfig sets viper keys for CleanOldHistory and registers cleanup.
-func setCleanupConfig(t *testing.T, cleanUp bool, ttl, maxSize, limit int) {
-	t.Helper()
-	viper.Set("clean_up", cleanUp)
-	viper.Set("ttl", ttl)
-	viper.Set("max_size", maxSize)
-	viper.Set("limit", limit)
-	t.Cleanup(viper.Reset)
 }
 
 func TestNewRepository(t *testing.T) {
@@ -443,45 +431,49 @@ func TestReset_ThenWrite(t *testing.T) {
 }
 
 func TestCleanOldHistory_Disabled(t *testing.T) {
+	t.Parallel()
 	repo := setupTestDB(t)
 	seedItems(t, repo, 3)
-	setCleanupConfig(t, false, 0, 0, 0)
 
-	if err := CleanOldHistory(repo); err != nil {
+	cfg := CleanupConfig{CleanUp: false}
+	if err := CleanOldHistory(repo, cfg); err != nil {
 		t.Fatalf("CleanOldHistory() failed: %v", err)
 	}
 	assertCount(t, repo, 3)
 }
 
 func TestCleanOldHistory_TTL(t *testing.T) {
+	t.Parallel()
 	repo := setupTestDB(t)
 	insertOldItem(t, repo, "old", "ttlhash1", 10)
 	if err := repo.Write([]byte("recent")); err != nil {
 		t.Fatalf("Write() failed: %v", err)
 	}
-	setCleanupConfig(t, true, 7, 0, 0)
 
-	if err := CleanOldHistory(repo); err != nil {
+	cfg := CleanupConfig{CleanUp: true, TTL: 7}
+	if err := CleanOldHistory(repo, cfg); err != nil {
 		t.Fatalf("CleanOldHistory() failed: %v", err)
 	}
 	assertCount(t, repo, 1)
 }
 
 func TestCleanOldHistory_TTLTakesPrecedenceOverMaxSize(t *testing.T) {
+	t.Parallel()
 	repo := setupTestDB(t)
 	seedItems(t, repo, 10)
 	insertOldItem(t, repo, "old-0", "oldhash-prec0", 20)
 	insertOldItem(t, repo, "old-1", "oldhash-prec1", 20)
 	// TTL=7 removes only the 2 old items; max_size=5 would trim more but is ignored
-	setCleanupConfig(t, true, 7, 5, 5)
+	cfg := CleanupConfig{CleanUp: true, TTL: 7, MaxSize: 5, Limit: 5}
 
-	if err := CleanOldHistory(repo); err != nil {
+	if err := CleanOldHistory(repo, cfg); err != nil {
 		t.Fatalf("CleanOldHistory() failed: %v", err)
 	}
 	assertCount(t, repo, 10)
 }
 
 func TestCleanOldHistory_MaxSize(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name      string
 		numItems  int
@@ -497,11 +489,12 @@ func TestCleanOldHistory_MaxSize(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			repo := setupTestDB(t)
 			seedItems(t, repo, tt.numItems)
-			setCleanupConfig(t, true, 0, tt.maxSize, tt.limit)
 
-			if err := CleanOldHistory(repo); err != nil {
+			cfg := CleanupConfig{CleanUp: true, TTL: 0, MaxSize: tt.maxSize, Limit: tt.limit}
+			if err := CleanOldHistory(repo, cfg); err != nil {
 				t.Fatalf("CleanOldHistory() failed: %v", err)
 			}
 			assertCount(t, repo, tt.wantCount)
@@ -510,6 +503,7 @@ func TestCleanOldHistory_MaxSize(t *testing.T) {
 }
 
 func TestCleanOldHistory_DefaultsWhenZeroOrNegative(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		maxSize int
@@ -521,11 +515,12 @@ func TestCleanOldHistory_DefaultsWhenZeroOrNegative(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			repo := setupTestDB(t)
 			seedItems(t, repo, 3)
-			setCleanupConfig(t, true, 0, tt.maxSize, tt.limit)
 
-			if err := CleanOldHistory(repo); err != nil {
+			cfg := CleanupConfig{CleanUp: true, TTL: 0, MaxSize: tt.maxSize, Limit: tt.limit}
+			if err := CleanOldHistory(repo, cfg); err != nil {
 				t.Fatalf("CleanOldHistory() failed: %v", err)
 			}
 			// 3 items is well under DefaultMaxSize (500), so no deletion

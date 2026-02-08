@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	gclip "golang.design/x/clipboard"
 
 	"github.com/kaliv0/homie/internal/clipboard"
@@ -63,7 +64,16 @@ var (
 				log.Logger().Fatal(err)
 			}
 
-			if err := storage.CleanOldHistory(db); err != nil {
+			if err := config.ReadConfig(); err != nil {
+				log.Logger().Println(err)
+			}
+			cfg := storage.CleanupConfig{
+				CleanUp: viper.GetBool("clean_up"),
+				TTL:     viper.GetInt("ttl"),
+				MaxSize: viper.GetInt("max_size"),
+				Limit:   viper.GetInt("limit"),
+			}
+			if err := storage.CleanOldHistory(db, cfg); err != nil {
 				log.Logger().Println(err)
 			}
 

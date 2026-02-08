@@ -11,10 +11,6 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/spf13/viper"
-
-	"github.com/kaliv0/homie/internal/config"
-	"github.com/kaliv0/homie/internal/log"
 )
 
 const (
@@ -209,26 +205,31 @@ func (r *Repository) Close() error {
 	return r.db.Close()
 }
 
+// CleanupConfig holds settings for history cleanup.
+type CleanupConfig struct {
+	CleanUp bool
+	TTL     int
+	MaxSize int
+	Limit   int
+}
+
 // CleanOldHistory trims clipboard history based on ttl or max_size settings.
-func CleanOldHistory(db *Repository) error {
-	if err := config.ReadConfig(); err != nil {
-		log.Logger().Println(err)
-	}
-	if shouldClean := viper.GetBool("clean_up"); !shouldClean {
+func CleanOldHistory(db *Repository, cfg CleanupConfig) error {
+	if !cfg.CleanUp {
 		return nil
 	}
 
 	// ttl takes precedence over 'size limit' strategy
-	if ttl := viper.GetInt("ttl"); ttl > 0 {
-		return db.DeleteOldest(ttl)
+	if cfg.TTL > 0 {
+		return db.DeleteOldest(cfg.TTL)
 	}
 
-	maxSize := viper.GetInt("max_size")
+	maxSize := cfg.MaxSize
 	if maxSize <= 0 {
 		maxSize = DefaultMaxSize
 	}
 
-	minLimit := viper.GetInt("limit")
+	minLimit := cfg.Limit
 	if minLimit <= 0 {
 		minLimit = DefaultLimit
 	}

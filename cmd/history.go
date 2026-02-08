@@ -98,14 +98,8 @@ func fetchDisplayHistory() (string, error) {
 }
 
 func writeToClipboard(text string) error {
-	useXclip := viper.GetBool("use_xclip")
-	if _, err := exec.LookPath("xclip"); err != nil {
-		log.Logger().Println("xclip not found, falling back to \"golang.design/x/clipboard\"")
-		useXclip = false
-	}
-
-	if runtime.GOOS == "linux" && useXclip {
-		return clipboard.Write(text)
+	if tool := clipboardTool(); tool != "" {
+		return clipboard.Write(text, tool)
 	}
 
 	if err := gclip.Init(); err != nil {
@@ -113,6 +107,21 @@ func writeToClipboard(text string) error {
 	}
 	gclip.Write(gclip.FmtText, []byte(text))
 	return nil
+}
+
+func clipboardTool() string {
+	if runtime.GOOS != "linux" {
+		return ""
+	}
+	for _, tool := range []string{"xclip", "xsel"} {
+		if viper.GetBool("use_" + tool) {
+			if _, err := exec.LookPath(tool); err == nil {
+				return tool
+			}
+			log.Logger().Printf("%s not found", tool)
+		}
+	}
+	return ""
 }
 
 func pasteText(text string) error {

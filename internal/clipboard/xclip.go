@@ -25,19 +25,24 @@ func Write(text, tool string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create stdin pipe for clip write (cmd=%s %v): %w", cmdName, args, err)
 	}
+	// ensure pipe is closed on all exit paths
+	defer func() {
+		_ = in.Close()
+	}()
 
-	err = cmd.Start()
-	if err != nil {
+	if err = cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start clip command for write (cmd=%s %v): %w", cmdName, args, err)
 	}
+	// ensure subprocess is reaped on all exit paths
+	defer func() {
+		_ = cmd.Wait()
+	}()
 
-	_, err = in.Write([]byte(text))
-	if err != nil {
+	if _, err = in.Write([]byte(text)); err != nil {
 		return fmt.Errorf("failed to write text to clip stdin (length=%d): %w", len(text), err)
 	}
 
-	err = in.Close()
-	if err != nil {
+	if err = in.Close(); err != nil {
 		return fmt.Errorf("failed to close clip stdin pipe: %w", err)
 	}
 

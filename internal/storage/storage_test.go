@@ -27,16 +27,18 @@ func setupTestDB(t *testing.T) *Repository {
 	return repo
 }
 
-// seedItems writes n unique items to the repo. When withSleep is true, items
-// are spaced apart in time so ordering is deterministic.
-func seedItems(t *testing.T, repo *Repository, n int, withSleep bool) {
+// seedItems inserts n unique items with explicit timestamps spaced 1s apart.
+func seedItems(t *testing.T, repo *Repository, n int) {
 	t.Helper()
+	base := time.Now().Add(-time.Duration(n-1) * time.Second)
 	for i := range n {
-		if err := repo.Write(fmt.Appendf(nil, "item-%d", i)); err != nil {
-			t.Fatalf("Write(item-%d) failed: %v", i, err)
-		}
-		if withSleep {
-			time.Sleep(10 * time.Millisecond)
+		text := fmt.Sprintf("item-%d", i)
+		ts := base.Add(time.Duration(i) * time.Second)
+		_, err := repo.db.Exec(
+			`INSERT INTO clipboard_items (clip_text, text_hash, time_stamp) VALUES (?, ?, ?)`,
+			text, fmt.Sprintf("hash-%d", i), ts)
+		if err != nil {
+			t.Fatalf("seedItems(%d) failed: %v", i, err)
 		}
 	}
 }
@@ -141,7 +143,6 @@ func TestWrite_Deduplication(t *testing.T) {
 	if err := repo.Write([]byte("duplicate")); err != nil {
 		t.Fatalf("first Write() failed: %v", err)
 	}
-	time.Sleep(10 * time.Millisecond)
 	if err := repo.Write([]byte("duplicate")); err != nil {
 		t.Fatalf("second Write() failed: %v", err)
 	}
@@ -191,8 +192,6 @@ func TestWrite_DuplicateUpdatesTimestamp(t *testing.T) {
 	items1, _ := repo.Read(0, 10)
 	ts1 := items1[0].TimeStamp
 
-	time.Sleep(20 * time.Millisecond)
-
 	if err := repo.Write([]byte("same")); err != nil {
 		t.Fatalf("second Write() failed: %v", err)
 	}
@@ -206,7 +205,11 @@ func TestWrite_DuplicateUpdatesTimestamp(t *testing.T) {
 
 func TestWrite_MultipleUniqueItems(t *testing.T) {
 	repo := setupTestDB(t)
-	seedItems(t, repo, 20, false)
+	for i := range 20 {
+		if err := repo.Write(fmt.Appendf(nil, "item-%d", i)); err != nil {
+			t.Fatalf("Write(item-%d) failed: %v", i, err)
+		}
+	}
 	assertCount(t, repo, 20)
 }
 
@@ -233,14 +236,7 @@ func TestWrite_SpecialCharacters(t *testing.T) {
 
 func TestRead_Ordering(t *testing.T) {
 	repo := setupTestDB(t)
-
-	texts := []string{"first", "second", "third"}
-	for _, text := range texts {
-		if err := repo.Write([]byte(text)); err != nil {
-			t.Fatalf("Write(%q) failed: %v", text, err)
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
+	seedItems(t, repo, 3)
 
 	items, err := repo.Read(0, 10)
 	if err != nil {
@@ -249,11 +245,11 @@ func TestRead_Ordering(t *testing.T) {
 	if len(items) != 3 {
 		t.Fatalf("expected 3 items, got %d", len(items))
 	}
-	if items[0].ClipText != "third" {
-		t.Errorf("expected first item=%q, got %q", "third", items[0].ClipText)
+	if items[0].ClipText != "item-2" {
+		t.Errorf("expected first item=%q, got %q", "item-2", items[0].ClipText)
 	}
-	if items[2].ClipText != "first" {
-		t.Errorf("expected last item=%q, got %q", "first", items[2].ClipText)
+	if items[2].ClipText != "item-0" {
+		t.Errorf("expected last item=%q, got %q", "item-0", items[2].ClipText)
 	}
 }
 
@@ -276,7 +272,7 @@ func TestRead_Limits(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := setupTestDB(t)
-			seedItems(t, repo, tt.numItems, true)
+			seedItems(t, repo, tt.numItems)
 
 			items, err := repo.Read(tt.offset, tt.limit)
 			if err != nil {
@@ -291,7 +287,7 @@ func TestRead_Limits(t *testing.T) {
 
 func TestRead_Pagination(t *testing.T) {
 	repo := setupTestDB(t)
-	seedItems(t, repo, 5, true)
+	seedItems(t, repo, 5)
 
 	page1, err := repo.Read(0, 2)
 	if err != nil {
@@ -312,7 +308,7 @@ func TestRead_Pagination(t *testing.T) {
 
 func TestRead_PaginationConsistency(t *testing.T) {
 	repo := setupTestDB(t)
-	seedItems(t, repo, 10, true)
+	seedItems(t, repo, 10)
 
 	var all []ClipboardItem
 	for offset := 0; offset < 10; offset += 3 {
@@ -338,7 +334,7 @@ func TestRead_PaginationConsistency(t *testing.T) {
 
 func TestCount(t *testing.T) {
 	repo := setupTestDB(t)
-	seedItems(t, repo, 3, false)
+	seedItems(t, repo, 3)
 	assertCount(t, repo, 3)
 }
 
@@ -363,7 +359,7 @@ func TestDeleteExcess(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := setupTestDB(t)
-			seedItems(t, repo, tt.numItems, true)
+			seedItems(t, repo, tt.numItems)
 
 			if err := repo.DeleteExcess(tt.deleteCount); err != nil {
 				t.Fatalf("DeleteExcess(%d) failed: %v", tt.deleteCount, err)
@@ -395,7 +391,7 @@ func TestDeleteOldest(t *testing.T) {
 			for i := range tt.oldCount {
 				insertOldItem(t, repo, fmt.Sprintf("old-%d", i), fmt.Sprintf("hash-%s-%d", tt.name, i), tt.oldDays)
 			}
-			seedItems(t, repo, tt.newCount, false)
+			seedItems(t, repo, tt.newCount)
 
 			if err := repo.DeleteOldest(tt.ttl); err != nil {
 				t.Fatalf("DeleteOldest(%d) failed: %v", tt.ttl, err)
@@ -407,7 +403,7 @@ func TestDeleteOldest(t *testing.T) {
 
 func TestReset(t *testing.T) {
 	repo := setupTestDB(t)
-	seedItems(t, repo, 3, false)
+	seedItems(t, repo, 3)
 
 	if err := repo.Reset(); err != nil {
 		t.Fatalf("Reset() failed: %v", err)
@@ -448,7 +444,7 @@ func TestReset_ThenWrite(t *testing.T) {
 
 func TestCleanOldHistory_Disabled(t *testing.T) {
 	repo := setupTestDB(t)
-	seedItems(t, repo, 3, false)
+	seedItems(t, repo, 3)
 	setCleanupConfig(t, false, 0, 0, 0)
 
 	if err := CleanOldHistory(repo); err != nil {
@@ -473,7 +469,7 @@ func TestCleanOldHistory_TTL(t *testing.T) {
 
 func TestCleanOldHistory_TTLTakesPrecedenceOverMaxSize(t *testing.T) {
 	repo := setupTestDB(t)
-	seedItems(t, repo, 10, true)
+	seedItems(t, repo, 10)
 	insertOldItem(t, repo, "old-0", "oldhash-prec0", 20)
 	insertOldItem(t, repo, "old-1", "oldhash-prec1", 20)
 	// TTL=7 removes only the 2 old items; max_size=5 would trim more but is ignored
@@ -502,7 +498,7 @@ func TestCleanOldHistory_MaxSize(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := setupTestDB(t)
-			seedItems(t, repo, tt.numItems, true)
+			seedItems(t, repo, tt.numItems)
 			setCleanupConfig(t, true, 0, tt.maxSize, tt.limit)
 
 			if err := CleanOldHistory(repo); err != nil {
@@ -526,7 +522,7 @@ func TestCleanOldHistory_DefaultsWhenZeroOrNegative(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := setupTestDB(t)
-			seedItems(t, repo, 3, false)
+			seedItems(t, repo, 3)
 			setCleanupConfig(t, true, 0, tt.maxSize, tt.limit)
 
 			if err := CleanOldHistory(repo); err != nil {

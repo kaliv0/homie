@@ -2,4 +2,5 @@ limit: 15         # minimum amount after clean_up
 #max_size: 500    # maximum amount of stored records
 ttl: 7            # retention period in days
 clean_up: false   # skip clean_up step entirely
-#use_xclip: false # use xclip for clipboard text management on linux
+use_xclip: true   # use xclip for clipboard text management on linux
+#use_xsel: false  # use xsel for the same reason

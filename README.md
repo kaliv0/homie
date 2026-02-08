@@ -17,7 +17,7 @@ Supports <i>fuzzy search</i>, <i>multi-select</i> and other adorable <i>chicaner
 ## Installation
 
 ```shell
-$ go install github.com/kaliv0/homie@latest
+go install github.com/kaliv0/homie@latest
 ```
 On `linux` you would also need `xclip` or `xsel` installed as an external dependency
 
@@ -26,14 +26,14 @@ On `linux` you would also need `xclip` or `xsel` installed as an external depend
 ## Usage
 
 ```shell
-$ homie start
+homie start
 ```
 
 Runs <i>homie</i> in a daemon process to track your clipboard.<br>
 It stores all copied items in a sqlite3 `homie.db` file under <i>\$XDG_CONFIG_HOME/</i> or <i>\$HOME/.config/</i> path.
 
 ```shell
-$ homie stop
+homie stop
 ```
 
 Stop the daemon process. You will be able to open the <i>history window</i>,<br>
@@ -41,7 +41,7 @@ search and select (and of course - paste) items from it,
 but <i>homie</i> won't track any new changes in the clipboard.
 
 ```shell
-$ homie history
+homie history
 ```
 
 Opens a preview window of the copied chronology.<br>
@@ -55,7 +55,7 @@ After selecting an record and closing the window, <i>homie</i> puts the text ins
 To paste the text directly in your terminal run the `history` command with <i>--paste</i>.<br>
 
 ```shell
-$ homie clear
+homie clear
 ```
 
 Deletes all items from the `homie.db` store
@@ -65,20 +65,20 @@ Deletes all items from the `homie.db` store
 ## External configuration
 
 ```shell
-$ homie shell
+homie shell
 ```
 
 Generates a shell configuration for your `.bashrc` that will start the application automatically<br>
 as well add extra key bindings for opening the preview window.
 
 ```shell
-$ homie completion
+homie completion
 ```
 
 Generates a shell configuration for the `.bash_completion` file that will enable auto_complete for all <i>homie</i> commands<br>
 
 ```shell
-$ homie tmux
+homie tmux
 ```
 
 Generates a tmux integration script for your `.tmux.conf`. Requires tmux 3.2+ (for `display-popup` support).<br>

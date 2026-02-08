@@ -81,7 +81,7 @@ func newLoadChannelFixture(t *testing.T, reader HistoryReader, initHistory []sto
 // triggerLoad sends a load signal.
 func (f *loadChannelFixture) triggerLoad() {
 	f.loadMore <- struct{}{}
-	time.Sleep(time.Millisecond)
+	time.Sleep(5 * time.Millisecond)
 }
 
 // historyLen returns the current history length.

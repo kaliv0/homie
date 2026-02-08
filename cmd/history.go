@@ -116,11 +116,13 @@ func clipboardTool() string {
 	for _, tool := range []string{"xclip", "xsel"} {
 		if viper.GetBool("use_" + tool) {
 			if _, err := exec.LookPath(tool); err == nil {
+				log.Logger().Printf("using %s as clipboardTool", tool)
 				return tool
 			}
 			log.Logger().Printf("%s not found", tool)
 		}
 	}
+	log.Logger().Println(`falling back to "golang.design/x/clipboard"`)
 	return ""
 }
 

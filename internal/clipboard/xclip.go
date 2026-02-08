@@ -11,6 +11,7 @@ func Write(text, tool string) error {
 	var args []string
 	switch tool {
 	case "xclip":
+		// although tool and cmdName point to the same string value, we keep them separated (loosely coupled)
 		cmdName, args = "xclip", []string{"-in", "-selection", "clipboard"}
 	case "xsel":
 		cmdName, args = "xsel", []string{"--input", "--clipboard"}

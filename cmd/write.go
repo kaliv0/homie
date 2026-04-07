@@ -13,7 +13,7 @@ import (
 )
 
 var writeCmd = &cobra.Command{
-	Use:                   "write",
+	Use:    "write",
 	Hidden: true,
 	Run: func(cmd *cobra.Command, _ []string) {
 		data, err := io.ReadAll(os.Stdin)
@@ -41,6 +41,7 @@ var writeCmd = &cobra.Command{
 		if err != nil {
 			log.Logger().Fatal(err)
 		}
+
 		defer func() {
 			if closeErr := db.Close(); closeErr != nil {
 				log.Logger().Println(closeErr)

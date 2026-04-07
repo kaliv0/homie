@@ -1,14 +1,20 @@
 ###  Homie tmux config  ###
 run-shell "homie start"
 
-# Open clipboard history (copies selection to system clipboard)
+## Open clipboard history (copies selection to system clipboard)
 bind-key h display-popup -E "homie history"
 
-# Open clipboard history and paste into active pane
+## Open clipboard history and paste into active pane
 bind-key p display-popup -E "HOMIE_TARGET_PANE='#{pane_id}' homie history --paste"
 
-# Copy selection to system clipboard and homie history (vi copy mode)
+## Copy selection to system clipboard and homie history (vi copy mode)
 bind-key -T copy-mode-vi y send-keys -X copy-pipe-and-cancel "homie write"
 
-# Copy selection to system clipboard and homie history (emacs copy mode)
-bind-key -T copy-mode Enter send-keys -X copy-pipe-and-cancel "homie write"
+## Copy selection to system clipboard and homie history (emacs copy mode)
+# bind-key -T copy-mode Enter send-keys -X copy-pipe-and-cancel "homie write"
+
+## If 'use_xclip: true' in your .homierc you can pipe directly to xclip
+# bind-key -T copy-mode Enter send-keys -X copy-pipe-and-cancel "xclip -in -selection clipboard"
+
+## Similarly for use_xsel:
+# bind-key -T copy-mode Enter send-keys -X copy-pipe-and-cancel "xsel --input --clipboard"

@@ -5,18 +5,21 @@ import (
 	"errors"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/kaliv0/homie/internal/storage"
 )
 
 type mockReader struct {
-	pages   map[int][]storage.ClipboardItem
-	readErr error
-	count   int
+	pages     map[int][]storage.ClipboardItem
+	readErr   error
+	count     int
+	readCalls chan struct{}
 }
 
 func (m *mockReader) Read(offset, _ int) ([]storage.ClipboardItem, error) {
+	if m.readCalls != nil {
+		m.readCalls <- struct{}{}
+	}
 	if m.readErr != nil {
 		return nil, m.readErr
 	}
@@ -32,6 +35,15 @@ func (m *mockReader) Count() (int, error) {
 
 func (m *mockReader) Close() error {
 	return nil
+}
+
+func newMockReader(pages map[int][]storage.ClipboardItem, readErr error, count int) *mockReader {
+	return &mockReader{
+		pages:     pages,
+		readErr:   readErr,
+		count:     count,
+		readCalls: make(chan struct{}, 64),
+	}
 }
 
 // countingMockReader counts Read calls.
@@ -51,6 +63,37 @@ func (c *countingMockReader) Count() (int, error) {
 
 func (c *countingMockReader) Close() error {
 	return nil
+}
+
+func waitForReads(t *testing.T, calls <-chan struct{}, n int) {
+	t.Helper()
+	for range n {
+		<-calls
+	}
+}
+
+type limitsCase struct {
+	name    string
+	pages   map[int][]storage.ClipboardItem
+	total   int
+	offset  int
+	limit   int
+	signals int
+	wantMin int
+	wantMax int
+	initLen int
+}
+
+func readsToWait(tc limitsCase) int {
+	if tc.limit <= 0 || tc.offset >= tc.total || tc.signals <= 0 {
+		return 0
+	}
+
+	maxReads := (tc.total - tc.offset + tc.limit - 1) / tc.limit
+	if tc.signals < maxReads {
+		return tc.signals
+	}
+	return maxReads
 }
 
 // loadChannelFixture is shared test state.
@@ -78,12 +121,6 @@ func newLoadChannelFixture(t *testing.T, reader HistoryReader, initHistory []sto
 	return f
 }
 
-// triggerLoad sends a load signal.
-func (f *loadChannelFixture) triggerLoad() {
-	f.loadMore <- struct{}{}
-	time.Sleep(5 * time.Millisecond)
-}
-
 // historyLen returns the current history length.
 func (f *loadChannelFixture) historyLen() int {
 	mu.RLock()
@@ -92,15 +129,17 @@ func (f *loadChannelFixture) historyLen() int {
 }
 
 func TestHandleLoadChannel_LoadsPages(t *testing.T) {
-	reader := &mockReader{
-		pages: map[int][]storage.ClipboardItem{
+	reader := newMockReader(
+		map[int][]storage.ClipboardItem{
 			5: {{ID: 1, ClipText: "page2-item1"}, {ID: 2, ClipText: "page2-item2"}},
 		},
-		count: 10,
-	}
+		nil,
+		10,
+	)
 	f := newLoadChannelFixture(t, reader, []storage.ClipboardItem{{ID: 0, ClipText: "page1-item1"}}, 0, 5, 10)
 
-	f.triggerLoad()
+	f.loadMore <- struct{}{}
+	waitForReads(t, reader.readCalls, 1)
 
 	if n := f.historyLen(); n != 3 {
 		t.Errorf("expected 3 items in history, got %d", n)
@@ -108,11 +147,11 @@ func TestHandleLoadChannel_LoadsPages(t *testing.T) {
 }
 
 func TestHandleLoadChannel_StopsAtTotal(t *testing.T) {
-	reader := &mockReader{pages: map[int][]storage.ClipboardItem{}, count: 5}
+	reader := newMockReader(map[int][]storage.ClipboardItem{}, nil, 5)
 	countReader := &countingMockReader{reader: reader, callCount: 0}
 
 	f := newLoadChannelFixture(t, countReader, nil, 5, 5, 5)
-	f.triggerLoad()
+	f.loadMore <- struct{}{}
 
 	if countReader.callCount != 0 {
 		t.Errorf("expected 0 reads when offset >= total, got %d", countReader.callCount)
@@ -121,32 +160,23 @@ func TestHandleLoadChannel_StopsAtTotal(t *testing.T) {
 
 func TestHandleLoadChannel_ContextCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	reader := &mockReader{count: 100}
+	reader := newMockReader(nil, nil, 100)
 	var history []storage.ClipboardItem
 	var wg sync.WaitGroup
 	loadMore := handleLoadChannel(ctx, &history, reader, 0, 5, 100, &wg)
 
 	cancel()
 
-	done := make(chan struct{})
-	go func() {
-		wg.Wait()
-		close(done)
-	}()
-
-	select {
-	case <-done:
-	case <-time.After(time.Second):
-		t.Fatal("goroutine did not exit after context cancel")
-	}
+	wg.Wait()
 	close(loadMore)
 }
 
 func TestHandleLoadChannel_ReadError(t *testing.T) {
-	reader := &mockReader{readErr: errors.New("db error"), count: 100}
+	reader := newMockReader(nil, errors.New("db error"), 100)
 	f := newLoadChannelFixture(t, reader, nil, 0, 5, 100)
 
-	f.triggerLoad()
+	f.loadMore <- struct{}{}
+	waitForReads(t, reader.readCalls, 1)
 
 	if n := f.historyLen(); n != 0 {
 		t.Errorf("expected 0 items after read error, got %d", n)
@@ -154,38 +184,17 @@ func TestHandleLoadChannel_ReadError(t *testing.T) {
 }
 
 func TestHandleLoadChannel_ChannelClose(t *testing.T) {
-	reader := &mockReader{count: 100}
+	reader := newMockReader(nil, nil, 100)
 	var history []storage.ClipboardItem
 	var wg sync.WaitGroup
 	loadMore := handleLoadChannel(t.Context(), &history, reader, 0, 5, 100, &wg)
 
 	close(loadMore)
-
-	done := make(chan struct{})
-	go func() {
-		wg.Wait()
-		close(done)
-	}()
-
-	select {
-	case <-done:
-	case <-time.After(time.Second):
-		t.Fatal("goroutine did not exit after channel close")
-	}
+	wg.Wait()
 }
 
 func TestHandleLoadChannel_Limits(t *testing.T) {
-	tests := []struct {
-		name    string
-		pages   map[int][]storage.ClipboardItem
-		total   int
-		offset  int
-		limit   int
-		signals int
-		wantMin int
-		wantMax int
-		initLen int
-	}{
+	tests := []limitsCase{
 		{
 			name: "limit one sequential loads",
 			pages: map[int][]storage.ClipboardItem{
@@ -222,7 +231,7 @@ func TestHandleLoadChannel_Limits(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			reader := &mockReader{pages: tt.pages, count: tt.total}
+			reader := newMockReader(tt.pages, nil, tt.total)
 			init := make([]storage.ClipboardItem, tt.initLen)
 			for i := range init {
 				init[i] = storage.ClipboardItem{ID: i + 1, ClipText: "init"}
@@ -231,8 +240,9 @@ func TestHandleLoadChannel_Limits(t *testing.T) {
 			f := newLoadChannelFixture(t, reader, init, tt.offset, tt.limit, tt.total)
 
 			for range tt.signals {
-				f.triggerLoad()
+				f.loadMore <- struct{}{}
 			}
+			waitForReads(t, reader.readCalls, readsToWait(tt))
 
 			n := f.historyLen()
 			if n < tt.wantMin || n > tt.wantMax {
@@ -243,41 +253,45 @@ func TestHandleLoadChannel_Limits(t *testing.T) {
 }
 
 func TestHandleLoadChannel_MultipleLoads(t *testing.T) {
-	reader := &mockReader{
-		pages: map[int][]storage.ClipboardItem{
+	reader := newMockReader(
+		map[int][]storage.ClipboardItem{
 			5:  {{ID: 6, ClipText: "p2-1"}, {ID: 7, ClipText: "p2-2"}},
 			10: {{ID: 8, ClipText: "p3-1"}},
 			15: {},
 		},
-		count: 15,
-	}
+		nil,
+		15,
+	)
 	f := newLoadChannelFixture(t, reader, []storage.ClipboardItem{{ID: 1, ClipText: "p1-1"}}, 0, 5, 15)
 
-	f.triggerLoad()
+	f.loadMore <- struct{}{}
+	waitForReads(t, reader.readCalls, 1)
 	if n := f.historyLen(); n != 3 {
 		t.Errorf("after page 2: expected 3 items, got %d", n)
 	}
 
-	f.triggerLoad()
+	f.loadMore <- struct{}{}
+	waitForReads(t, reader.readCalls, 1)
 	if n := f.historyLen(); n != 4 {
 		t.Errorf("after page 3: expected 4 items, got %d", n)
 	}
 
-	f.triggerLoad()
+	f.loadMore <- struct{}{}
 	if n := f.historyLen(); n != 4 {
 		t.Errorf("after empty page: expected 4 items, got %d", n)
 	}
 }
 
 func TestHandleLoadChannel_RapidSignals(t *testing.T) {
-	reader := &mockReader{
-		pages: map[int][]storage.ClipboardItem{
+	reader := newMockReader(
+		map[int][]storage.ClipboardItem{
 			5:  {{ID: 2, ClipText: "p2"}},
 			10: {{ID: 3, ClipText: "p3"}},
 			15: {{ID: 4, ClipText: "p4"}},
 		},
-		count: 20,
-	}
+		nil,
+		20,
+	)
 	f := newLoadChannelFixture(t, reader, []storage.ClipboardItem{{ID: 1, ClipText: "init"}}, 0, 5, 20)
 
 	for range 5 {
@@ -286,7 +300,7 @@ func TestHandleLoadChannel_RapidSignals(t *testing.T) {
 		default:
 		}
 	}
-	time.Sleep(5 * time.Millisecond)
+	waitForReads(t, reader.readCalls, 1)
 
 	if n := f.historyLen(); n < 2 {
 		t.Errorf("expected at least 2 items after rapid signals, got %d", n)

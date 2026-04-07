@@ -186,17 +186,15 @@ func TestTrackClipboard_ContextCancelDuringItems(t *testing.T) {
 	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 
-	ch := make(chan []byte, 5)
+	ch := make(chan []byte)
 	writer := &mockWriter{}
-
-	ch <- []byte("before-cancel")
 
 	done := make(chan error, 1)
 	go func() {
 		done <- TrackClipboard(ctx, writer, ch)
 	}()
 
-	time.Sleep(50 * time.Millisecond)
+	ch <- []byte("before-cancel")
 	cancel()
 
 	select {

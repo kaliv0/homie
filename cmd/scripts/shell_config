@@ -9,7 +9,7 @@ __homie_history()
     READLINE_POINT=${#READLINE_LINE}
 }
 
-# Uncomment next line and define limit
+## Uncomment next line and define limit
 #HOMIE_LIMIT=<limit>
 if [[ $HOMIE_LIMIT ]]; then
     bind -x '"\C-h": __homie_history --limit "${HOMIE_LIMIT}"'

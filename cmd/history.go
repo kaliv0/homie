@@ -163,7 +163,7 @@ func init() {
 	if err := viper.BindPFlag("limit", listHistoryCmd.Flags().Lookup("limit")); err != nil {
 		log.Logger().Fatalf("failed to bind 'limit' flag to viper: %v", err)
 	}
-	viper.SetDefault("use_xclip", true)
+	viper.SetDefault("use_xclip", false)
 
 	rootCmd.AddCommand(listHistoryCmd)
 	rootCmd.AddCommand(clearHistoryCmd)

@@ -25,10 +25,6 @@ var writeCmd = &cobra.Command{
 			return
 		}
 
-		if err := config.ReadConfig(); err != nil {
-			log.Logger().Println(err)
-		}
-
 		if err := writeToClipboard(text); err != nil {
 			log.Logger().Fatal(err)
 		}

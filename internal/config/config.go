@@ -11,6 +11,12 @@ import (
 )
 
 const (
+	// Viper keys (and YAML keys in .homierc).
+	ViperKeyVerbose = "verbose"
+	ViperKeyLogFile = "log_file"
+)
+
+const (
 	xdgConf       = "XDG_CONFIG_HOME"
 	appConfPath   = "$HOME/"
 	dbConfDirPerm = 0755
@@ -20,12 +26,16 @@ const (
 
 	confFileName = ".homierc"
 	confFileType = "yaml"
+
 )
 
 // ReadConfig loads configuration from ~/.homierc once.
 var ReadConfig = sync.OnceValue(readConfig)
 
 func readConfig() error {
+	viper.SetDefault(ViperKeyVerbose, 0)
+	viper.SetDefault(ViperKeyLogFile, "")
+
 	viper.SetConfigName(confFileName)
 	viper.SetConfigType(confFileType)
 	viper.AddConfigPath(appConfPath)

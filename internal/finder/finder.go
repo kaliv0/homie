@@ -25,6 +25,7 @@ var mu sync.RWMutex
 
 // ListHistory loads clipboard history and presents a fuzzy finder.
 func ListHistory(dbPath string, limit int) (string, error) {
+	log.Debugf("opening history db=%q limit=%d\n", dbPath, limit)
 	// load history
 	db, err := storage.NewRepository(dbPath)
 	if err != nil {
@@ -84,26 +85,28 @@ func handleLoadChannel(ctx context.Context, history *[]storage.ClipboardItem, db
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		currentOffset := offset
+		loadedOffset := offset
 		for {
 			select {
 			case _, ok := <-loadMore:
 				if !ok {
 					return
 				}
-				if currentOffset < total {
-					currentOffset += limit
-					page, err := db.Read(currentOffset, limit)
-					if err != nil {
-						log.Logger().Printf("failed to load more history items (offset=%d, limit=%d, total=%d): %v\n",
-							currentOffset, limit, total, err)
-						continue
-					}
-					if len(page) > 0 {
-						mu.Lock()
-						*history = append(*history, page...)
-						mu.Unlock()
-					}
+				candidateOffset := loadedOffset + limit
+				if candidateOffset >= total {
+					continue
+				}
+				loadedOffset = candidateOffset
+				page, err := db.Read(loadedOffset, limit)
+				if err != nil {
+					log.Infof("failed to load more history items (offset=%d, limit=%d, total=%d): %v\n",
+						loadedOffset, limit, total, err)
+					continue
+				}
+				if len(page) > 0 {
+					mu.Lock()
+					*history = append(*history, page...)
+					mu.Unlock()
 				}
 			case <-ctx.Done():
 				return

@@ -528,3 +528,77 @@ func TestCleanOldHistory_DefaultsWhenZeroOrNegative(t *testing.T) {
 		})
 	}
 }
+
+func TestDeleteExcess_DeletesOldestRowsFirst(t *testing.T) {
+	repo := setupTestDB(t)
+	seedItems(t, repo, 5)
+
+	if err := repo.DeleteExcess(2); err != nil {
+		t.Fatalf("DeleteExcess(2) failed: %v", err)
+	}
+
+	items, err := repo.Read(0, 10)
+	if err != nil {
+		t.Fatalf("Read() failed: %v", err)
+	}
+	if len(items) != 3 {
+		t.Fatalf("expected 3 items after deleting 2 oldest, got %d", len(items))
+	}
+	// Read is newest-first; survivors should be item-4, item-3, item-2
+	want := []string{"item-4", "item-3", "item-2"}
+	for i, w := range want {
+		if items[i].ClipText != w {
+			t.Errorf("item[%d]: want clip_text %q, got %q", i, w, items[i].ClipText)
+		}
+	}
+}
+
+func TestCleanOldHistory_NoOpWhenTotalAtOrBelowMaxSize(t *testing.T) {
+	t.Parallel()
+	repo := setupTestDB(t)
+	seedItems(t, repo, 5)
+
+	cfg := CleanupConfig{CleanUp: true, TTL: 0, MaxSize: 10, Limit: 3}
+	if err := CleanOldHistory(repo, cfg); err != nil {
+		t.Fatalf("CleanOldHistory() failed: %v", err)
+	}
+	assertCount(t, repo, 5)
+}
+
+func TestCleanOldHistory_NoOpWhenMinLimitReachesTotal(t *testing.T) {
+	t.Parallel()
+	repo := setupTestDB(t)
+	seedItems(t, repo, 5)
+
+	// total > maxSize would normally trim, but minLimit >= total short-circuits
+	cfg := CleanupConfig{CleanUp: true, TTL: 0, MaxSize: 3, Limit: 5}
+	if err := CleanOldHistory(repo, cfg); err != nil {
+		t.Fatalf("CleanOldHistory() failed: %v", err)
+	}
+	assertCount(t, repo, 5)
+}
+
+func TestCleanOldHistory_MaxSizeKeepsNewestRows(t *testing.T) {
+	t.Parallel()
+	repo := setupTestDB(t)
+	seedItems(t, repo, 10)
+
+	cfg := CleanupConfig{CleanUp: true, TTL: 0, MaxSize: 5, Limit: 5}
+	if err := CleanOldHistory(repo, cfg); err != nil {
+		t.Fatalf("CleanOldHistory() failed: %v", err)
+	}
+
+	items, err := repo.Read(0, 10)
+	if err != nil {
+		t.Fatalf("Read() failed: %v", err)
+	}
+	if len(items) != 5 {
+		t.Fatalf("expected 5 items, got %d", len(items))
+	}
+	want := []string{"item-9", "item-8", "item-7", "item-6", "item-5"}
+	for i, w := range want {
+		if items[i].ClipText != w {
+			t.Errorf("item[%d]: want %q, got %q", i, w, items[i].ClipText)
+		}
+	}
+}

@@ -1,14 +1,23 @@
 package cmd
 
 import (
-	"os"
-
 	"github.com/spf13/cobra"
+
+	"github.com/kaliv0/homie/internal/config"
+	"github.com/kaliv0/homie/internal/log"
 )
 
 var rootCmd = &cobra.Command{
 	Use:   "homie",
 	Short: "Terminal-based clipboard manager",
+	PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+		// Single place for loading .homierc -> reused in children
+		if err := config.ReadConfig(); err != nil {
+			return err
+		}
+		log.ConfigureFromFlags(cmd.Flags())
+		return nil
+	},
 	Long: `
 		⣿⣿⣿⣿⣿⣿⣿⣿⣿⠟⠏⢀⣀⣤⣤⣤⣤⣤⣤⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 		⣿⣿⣿⣿⣿⣿⡿⣿⣴⢶⣶⣿⣟⣶⣿⣭⠿⠦⠤⠽⣷⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
@@ -37,9 +46,12 @@ var rootCmd = &cobra.Command{
 		⠻⠿⢿⣿⣿⣿⣿⠏⠉⠉⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠢⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 `}
 
+func init() {
+	rootCmd.PersistentFlags().CountP("verbose", "v", "adjust verbose level (e.g. -vv for debug)")
+	rootCmd.PersistentFlags().String("log-file", "", "append log output to given file")
+}
+
 // Execute runs the root cobra command.
-func Execute() {
-	if err := rootCmd.Execute(); err != nil {
-		os.Exit(1)
-	}
+func Execute() error {
+	return rootCmd.Execute()
 }

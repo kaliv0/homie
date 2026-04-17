@@ -1,7 +1,11 @@
 package main
 
-import "github.com/kaliv0/homie/cmd"
+import (
+	"github.com/spf13/cobra"
+
+	"github.com/kaliv0/homie/cmd"
+)
 
 func main() {
-	cmd.Execute()
+	cobra.CheckErr(cmd.Execute())
 }

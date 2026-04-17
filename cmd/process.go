@@ -64,9 +64,6 @@ var (
 				log.Logger().Fatal(err)
 			}
 
-			if err := config.ReadConfig(); err != nil {
-				log.Logger().Println(err)
-			}
 			cfg := storage.CleanupConfig{
 				CleanUp: viper.GetBool("clean_up"),
 				TTL:     viper.GetInt("ttl"),

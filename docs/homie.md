@@ -46,4 +46,5 @@ Terminal-based clipboard manager
 * [homie shell](homie_shell.md)	 - Generate a shell integration script
 * [homie start](homie_start.md)	 - Start clipboard manager
 * [homie stop](homie_stop.md)	 - Stop clipboard manager
+* [homie restart](homie_restart.md)	 - Restart clipboard manager
 

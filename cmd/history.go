@@ -25,10 +25,6 @@ var (
 		Long: `List clipboard history
   Use <tab> to pin and select multiple entries`,
 		Run: func(cmd *cobra.Command, _ []string) {
-			if err := config.ReadConfig(); err != nil {
-				log.Logger().Println(err)
-			}
-
 			output, err := fetchDisplayHistory()
 			if err != nil {
 				log.Logger().Fatal(err)
@@ -83,8 +79,7 @@ var (
 )
 
 func fetchDisplayHistory() (string, error) {
-	// limit is read in order:
-	//'--limit <n>' cli flag -> .homierc  -> Flags().IntP() default val
+	// limit via viper + BindPFlag: --limit/-l if set, else .homierc, else flag default.
 	limit := viper.GetInt("limit")
 	if limit <= 0 {
 		limit = storage.DefaultLimit
@@ -115,10 +110,10 @@ func clipboardTool() string {
 	}
 	for _, tool := range []string{"xclip", "xsel"} {
 		if viper.GetBool("use_" + tool) {
-			if _, err := exec.LookPath(tool); err == nil {
-				return tool
+			if _, err := exec.LookPath(tool); err != nil {
+				log.Logger().Printf("%s not found: %v\n", tool, err)
 			}
-			log.Logger().Printf("%s not found", tool)
+			return tool
 		}
 	}
 	return ""

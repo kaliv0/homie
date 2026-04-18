@@ -9,12 +9,6 @@ __homie_history()
     READLINE_POINT=${#READLINE_LINE}
 }
 
-## Uncomment next line and define limit
-#HOMIE_LIMIT=<limit>
-if [[ $HOMIE_LIMIT ]]; then
-    bind -x '"\C-h": __homie_history --limit "${HOMIE_LIMIT}"'
-    bind -x '"\C-p": __homie_history --paste --limit "${HOMIE_LIMIT}"'
-else
-    bind -x '"\C-h": __homie_history'
-    bind -x '"\C-p": __homie_history --paste'
-fi
+# NB: \C-h might conflict with traditional backspace mapping -> change to whatever you like
+bind -x '"\C-h": __homie_history'
+bind -x '"\C-p": __homie_history --paste'

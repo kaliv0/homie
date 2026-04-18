@@ -8,13 +8,24 @@ import (
 type mockProcess struct {
 	name       string
 	nameErr    error
+	args       []string
+	argsErr    error
 	pid        int32
 	terminated bool
 	termErr    error
 }
 
-func (m *mockProcess) Name() (string, error) { return m.name, m.nameErr }
-func (m *mockProcess) GetPid() int32         { return m.pid }
+func (m *mockProcess) GetName() (string, error) { return m.name, m.nameErr }
+func (m *mockProcess) GetPid() int32             { return m.pid }
+func (m *mockProcess) GetCliArgs() ([]string, error) {
+	if m.argsErr != nil {
+		return nil, m.argsErr
+	}
+	if m.args != nil {
+		return m.args, nil
+	}
+	return []string{"homie", "run"}, nil
+}
 func (m *mockProcess) Terminate() error {
 	m.terminated = true
 	return m.termErr
@@ -39,50 +50,74 @@ func newLister(procs ...Process) *mockProcessLister {
 	return &mockProcessLister{procs: procs, currentPid: 100}
 }
 
-// runStop calls StopAllInstances with the given lister and asserts no error.
-func runStop(t *testing.T, lister *mockProcessLister) {
+// assertDaemonStopped runs ProcessDaemons(lister, true) and fails the test on error or ok==false.
+func assertDaemonStopped(t *testing.T, lister *mockProcessLister) {
 	t.Helper()
-	if err := StopAllInstances(lister); err != nil {
-		t.Fatalf("StopAllInstances() failed: %v", err)
+	ok, err := ProcessDaemons(lister, true)
+	if err != nil {
+		t.Fatalf("ProcessDaemons(stop=true) failed: %v", err)
+	}
+	if !ok {
+		t.Fatal("ProcessDaemons(stop=true): expected ok=true, got false")
 	}
 }
 
-func TestStopAllInstances_TerminatesOtherHomie(t *testing.T) {
+func TestProcessDaemons_Stop_TerminatesOtherHomieRun(t *testing.T) {
 	t.Parallel()
 	other := &mockProcess{name: "homie", pid: 200}
-	runStop(t, newLister(other))
+	assertDaemonStopped(t, newLister(other))
 
 	if !other.terminated {
-		t.Error("expected other homie process to be terminated")
+		t.Error("expected other homie run process to be terminated")
 	}
 }
 
-func TestStopAllInstances_SkipsSelf(t *testing.T) {
+func TestProcessDaemons_Stop_SkipsSelf(t *testing.T) {
 	t.Parallel()
 	self := &mockProcess{name: "homie", pid: 100}
-	runStop(t, newLister(self))
+	assertDaemonStopped(t, newLister(self))
 
 	if self.terminated {
 		t.Error("should not terminate own process")
 	}
 }
 
-func TestStopAllInstances_SkipsNonHomie(t *testing.T) {
+func TestProcessDaemons_Stop_SkipsNonHomie(t *testing.T) {
 	t.Parallel()
 	other := &mockProcess{name: "firefox", pid: 200}
-	runStop(t, newLister(other))
+	assertDaemonStopped(t, newLister(other))
 
 	if other.terminated {
 		t.Error("should not terminate non-homie processes")
 	}
 }
 
-func TestStopAllInstances_ProcessEnumError(t *testing.T) {
+func TestProcessDaemons_Stop_SkipsHomieWithoutRunArg(t *testing.T) {
+	t.Parallel()
+	other := &mockProcess{name: "homie", pid: 200, args: []string{"homie", "start"}}
+	assertDaemonStopped(t, newLister(other))
+
+	if other.terminated {
+		t.Error("should not terminate homie without run subcommand in argv")
+	}
+}
+
+func TestProcessDaemons_Stop_SkipsHomieShortArgv(t *testing.T) {
+	t.Parallel()
+	other := &mockProcess{name: "homie", pid: 200, args: []string{"homie"}}
+	assertDaemonStopped(t, newLister(other))
+
+	if other.terminated {
+		t.Error("should not terminate homie with argv too short for run check")
+	}
+}
+
+func TestProcessDaemons_ProcessEnumError(t *testing.T) {
 	t.Parallel()
 	enumErr := errors.New("permission denied")
 	lister := &mockProcessLister{procsErr: enumErr, currentPid: 100}
 
-	err := StopAllInstances(lister)
+	_, err := ProcessDaemons(lister, true)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -91,75 +126,82 @@ func TestStopAllInstances_ProcessEnumError(t *testing.T) {
 	}
 }
 
-func TestStopAllInstances_NameError(t *testing.T) {
+func TestProcessDaemons_Stop_NameError(t *testing.T) {
 	t.Parallel()
 	proc := &mockProcess{nameErr: errors.New("access denied"), pid: 200}
-	runStop(t, newLister(proc))
+	assertDaemonStopped(t, newLister(proc))
 
 	if proc.terminated {
 		t.Error("should not terminate process with inaccessible name")
 	}
 }
 
-func TestStopAllInstances_NoProcesses(t *testing.T) {
+func TestProcessDaemons_Stop_CliArgsError(t *testing.T) {
 	t.Parallel()
-	runStop(t, newLister())
+	proc := &mockProcess{name: "homie", pid: 200, argsErr: errors.New("eaccess")}
+	assertDaemonStopped(t, newLister(proc))
+
+	if proc.terminated {
+		t.Error("should not terminate process when argv cannot be read")
+	}
 }
 
-func TestStopAllInstances_MultipleHomie(t *testing.T) {
+func TestProcessDaemons_Stop_NoProcesses(t *testing.T) {
+	t.Parallel()
+	assertDaemonStopped(t, newLister())
+}
+
+func TestProcessDaemons_Stop_MultipleHomieRun(t *testing.T) {
 	t.Parallel()
 	p1 := &mockProcess{name: "homie", pid: 200}
 	p2 := &mockProcess{name: "homie", pid: 300}
 	self := &mockProcess{name: "homie", pid: 100}
 
-	runStop(t, newLister(p1, self, p2))
+	assertDaemonStopped(t, newLister(p1, self, p2))
 
 	if !p1.terminated || !p2.terminated {
-		t.Error("expected other homie processes to be terminated")
+		t.Error("expected other homie run processes to be terminated")
 	}
 	if self.terminated {
 		t.Error("should not terminate self")
 	}
 }
 
-func TestStopAllInstances_TerminateErrors(t *testing.T) {
+func TestProcessDaemons_Stop_TerminateError(t *testing.T) {
 	t.Parallel()
-	tests := []struct {
-		name  string
-		procs []*mockProcess
-	}{
-		{
-			"single terminate error",
-			[]*mockProcess{{name: "homie", pid: 200, termErr: errors.New("err")}},
-		},
-		{
-			"multiple terminate errors",
-			[]*mockProcess{
-				{name: "homie", pid: 200, termErr: errors.New("err1")},
-				{name: "homie", pid: 300, termErr: errors.New("err2")},
-			},
-		},
+	proc := &mockProcess{name: "homie", pid: 200, termErr: errors.New("kill failed")}
+	lister := newLister(proc)
+
+	ok, err := ProcessDaemons(lister, true)
+	if err == nil {
+		t.Fatal("expected terminate error, got nil")
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			procs := make([]Process, len(tt.procs))
-			for i, p := range tt.procs {
-				procs[i] = p
-			}
-			runStop(t, newLister(procs...))
-
-			for _, p := range tt.procs {
-				if !p.terminated {
-					t.Errorf("terminate should be attempted on pid=%d", p.pid)
-				}
-			}
-		})
+	if ok {
+		t.Fatal("expected ok=false on terminate error")
+	}
+	if !proc.terminated {
+		t.Error("terminate should have been attempted")
 	}
 }
 
-func TestStopAllInstances_MixedProcesses(t *testing.T) {
+func TestProcessDaemons_Stop_StopsAfterFirstTerminateError(t *testing.T) {
+	t.Parallel()
+	first := &mockProcess{name: "homie", pid: 200, termErr: errors.New("err1")}
+	second := &mockProcess{name: "homie", pid: 300}
+
+	_, err := ProcessDaemons(newLister(first, second), true)
+	if err == nil {
+		t.Fatal("expected error from first terminate")
+	}
+	if !first.terminated {
+		t.Error("first process should have terminate attempted")
+	}
+	if second.terminated {
+		t.Error("should not attempt second terminate after first error")
+	}
+}
+
+func TestProcessDaemons_Stop_MixedProcesses(t *testing.T) {
 	t.Parallel()
 	homie1 := &mockProcess{name: "homie", pid: 200}
 	firefox := &mockProcess{name: "firefox", pid: 300}
@@ -167,10 +209,10 @@ func TestStopAllInstances_MixedProcesses(t *testing.T) {
 	chrome := &mockProcess{name: "chrome", pid: 500}
 	self := &mockProcess{name: "homie", pid: 100}
 
-	runStop(t, newLister(homie1, firefox, self, homie2, chrome))
+	assertDaemonStopped(t, newLister(homie1, firefox, self, homie2, chrome))
 
 	if !homie1.terminated || !homie2.terminated {
-		t.Error("expected homie processes to be terminated")
+		t.Error("expected homie run processes to be terminated")
 	}
 	if firefox.terminated || chrome.terminated {
 		t.Error("should not terminate non-homie processes")
@@ -180,7 +222,7 @@ func TestStopAllInstances_MixedProcesses(t *testing.T) {
 	}
 }
 
-func TestStopAllInstances_NameMatching(t *testing.T) {
+func TestProcessDaemons_Stop_NameMatching(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name       string
@@ -199,7 +241,7 @@ func TestStopAllInstances_NameMatching(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			proc := &mockProcess{name: tt.procName, pid: 200}
-			runStop(t, newLister(proc))
+			assertDaemonStopped(t, newLister(proc))
 
 			if proc.terminated != tt.wantKilled {
 				t.Errorf("process %q: terminated=%v, want %v", tt.procName, proc.terminated, tt.wantKilled)
@@ -208,14 +250,14 @@ func TestStopAllInstances_NameMatching(t *testing.T) {
 	}
 }
 
-func TestStopAllInstances_AllProcessesNameError(t *testing.T) {
+func TestProcessDaemons_Stop_AllProcessesNameError(t *testing.T) {
 	t.Parallel()
 	procs := []Process{
 		&mockProcess{nameErr: errors.New("err1"), pid: 200},
 		&mockProcess{nameErr: errors.New("err2"), pid: 300},
 		&mockProcess{nameErr: errors.New("err3"), pid: 400},
 	}
-	runStop(t, newLister(procs...))
+	assertDaemonStopped(t, newLister(procs...))
 
 	for _, p := range procs {
 		if p.(*mockProcess).terminated {
@@ -224,12 +266,61 @@ func TestStopAllInstances_AllProcessesNameError(t *testing.T) {
 	}
 }
 
-func TestStopAllInstances_OnlySelf(t *testing.T) {
+func TestProcessDaemons_Stop_OnlySelf(t *testing.T) {
 	t.Parallel()
 	self := &mockProcess{name: "homie", pid: 100}
-	runStop(t, newLister(self))
+	assertDaemonStopped(t, newLister(self))
 
 	if self.terminated {
 		t.Error("should not terminate self when it's the only process")
+	}
+}
+
+func TestProcessDaemons_Check_NoOtherDaemon(t *testing.T) {
+	t.Parallel()
+	self := &mockProcess{name: "homie", pid: 100}
+	ok, err := ProcessDaemons(newLister(self), false)
+	if err != nil {
+		t.Fatalf("ProcessDaemons(stop=false): %v", err)
+	}
+	if !ok {
+		t.Fatal("expected ok=true when no other homie run exists")
+	}
+}
+
+func TestProcessDaemons_Check_OtherDaemonRunning(t *testing.T) {
+	t.Parallel()
+	other := &mockProcess{name: "homie", pid: 200}
+	ok, err := ProcessDaemons(newLister(other), false)
+	if err != nil {
+		t.Fatalf("ProcessDaemons(stop=false): %v", err)
+	}
+	if ok {
+		t.Fatal("expected ok=false when another homie run is present")
+	}
+}
+
+func TestProcessDaemons_Check_SkipsNonRunHomie(t *testing.T) {
+	t.Parallel()
+	other := &mockProcess{name: "homie", pid: 200, args: []string{"homie", "start"}}
+	ok, err := ProcessDaemons(newLister(other), false)
+	if err != nil {
+		t.Fatalf("ProcessDaemons(stop=false): %v", err)
+	}
+	if !ok {
+		t.Fatal("homie without run should not block check")
+	}
+}
+
+func TestProcessDaemons_Check_FirstConflictShortCircuits(t *testing.T) {
+	t.Parallel()
+	a := &mockProcess{name: "homie", pid: 200}
+	b := &mockProcess{name: "homie", pid: 300}
+	ok, err := ProcessDaemons(newLister(a, b), false)
+	if err != nil {
+		t.Fatalf("ProcessDaemons(stop=false): %v", err)
+	}
+	if ok {
+		t.Fatal("expected conflict when multiple other daemons")
 	}
 }

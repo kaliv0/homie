@@ -5,14 +5,13 @@ import (
 	"os"
 
 	"github.com/shirou/gopsutil/process"
-
-	"github.com/kaliv0/homie/internal/log"
 )
 
 // Process represents a system process.
 type Process interface {
-	Name() (string, error)
+	GetName() (string, error)
 	GetPid() int32
+	GetCliArgs() ([]string, error)
 	Terminate() error
 }
 
@@ -27,9 +26,10 @@ type osProcess struct {
 	p *process.Process
 }
 
-func (o osProcess) Name() (string, error) { return o.p.Name() }
-func (o osProcess) GetPid() int32         { return o.p.Pid }
-func (o osProcess) Terminate() error      { return o.p.Terminate() }
+func (o osProcess) GetName() (string, error)      { return o.p.Name() }
+func (o osProcess) GetPid() int32                 { return o.p.Pid }
+func (o osProcess) GetCliArgs() ([]string, error) { return o.p.CmdlineSlice() }
+func (o osProcess) Terminate() error              { return o.p.Terminate() }
 
 // osProcessLister uses gopsutil to enumerate system processes.
 type osProcessLister struct{}
@@ -50,29 +50,46 @@ func (o osProcessLister) CurrentPid() int32 {
 	return int32(os.Getpid())
 }
 
-// StopAll terminates other running homie processes using the system process list.
-func StopAll() error {
-	return StopAllInstances(osProcessLister{})
+// CheckAll returns true when no other homie "run" process exists (self excluded).
+func CheckAll() (bool, error) {
+	return ProcessDaemons(osProcessLister{}, false)
 }
 
-// StopAllInstances terminates other running homie processes.
-func StopAllInstances(pl ProcessLister) error {
+// StopAll terminates other homie "run" processes only.
+func StopAll() (bool, error) {
+	return ProcessDaemons(osProcessLister{}, true)
+}
+
+// ProcessDaemons finds homie processes with argv[1]=="run", excluding pl.CurrentPid().
+// If stop is false, returns false when any match exists; if true, terminates matches.
+func ProcessDaemons(pl ProcessLister, stop bool) (bool, error) {
 	processes, err := pl.Processes()
 	if err != nil {
-		return fmt.Errorf("failed to enumerate processes: %w", err)
+		return false, fmt.Errorf("failed to enumerate processes: %w", err)
 	}
 
 	currentPid := pl.CurrentPid()
 	for _, p := range processes {
-		pName, err := p.Name()
+		pName, err := p.GetName()
 		if err != nil {
 			continue // Skip inaccessible processes
 		}
-		if pName == "homie" && currentPid != p.GetPid() {
-			if err = p.Terminate(); err != nil {
-				log.Logger().Printf("failed to terminate homie process (pid=%d): %v\n", p.GetPid(), err)
+
+		if pName == "homie" {
+			args, err := p.GetCliArgs()
+			if err != nil {
+				continue
+			}
+			if len(args) > 1 && args[1] == "run" && currentPid != p.GetPid() {
+				if !stop {
+					return false, nil
+				}
+				if err = p.Terminate(); err != nil {
+					return false, fmt.Errorf("failed to terminate homie process (pid=%d): %v", p.GetPid(), err)
+				}
 			}
 		}
 	}
-	return nil
+
+	return true, nil
 }

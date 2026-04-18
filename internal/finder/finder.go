@@ -84,26 +84,28 @@ func handleLoadChannel(ctx context.Context, history *[]storage.ClipboardItem, db
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		currentOffset := offset
+		loadedOffset := offset
 		for {
 			select {
 			case _, ok := <-loadMore:
 				if !ok {
 					return
 				}
-				if currentOffset < total {
-					currentOffset += limit
-					page, err := db.Read(currentOffset, limit)
-					if err != nil {
-						log.Logger().Printf("failed to load more history items (offset=%d, limit=%d, total=%d): %v\n",
-							currentOffset, limit, total, err)
-						continue
-					}
-					if len(page) > 0 {
-						mu.Lock()
-						*history = append(*history, page...)
-						mu.Unlock()
-					}
+				candidateOffset := loadedOffset + limit
+				if candidateOffset >= total {
+					continue
+				}
+				loadedOffset = candidateOffset
+				page, err := db.Read(loadedOffset, limit)
+				if err != nil {
+					log.Logger().Printf("failed to load more history items (offset=%d, limit=%d, total=%d): %v\n",
+							loadedOffset, limit, total, err)
+					continue
+				}
+				if len(page) > 0 {
+					mu.Lock()
+					*history = append(*history, page...)
+					mu.Unlock()
 				}
 			case <-ctx.Done():
 				return

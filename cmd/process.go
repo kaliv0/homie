@@ -24,18 +24,34 @@ var (
 		Short:                 "Start clipboard manager",
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, _ []string) {
-			if err := daemon.StopAll(); err != nil {
-				log.Logger().Println(err)
+			ok, err := daemon.CheckAll()
+			if err != nil {
+				log.Logger().Fatal(err)
 			}
+			if !ok {
+				if log.Verbose() {
+					log.Logger().Println("homie daemon is already running")
+				}
+			} else {
+				runDaemon(cmd)
+				if log.Verbose() {
+					log.Logger().Println("homie daemon started")
+				}
+			}
+		},
+	}
 
-			cmdName := cmd.Root().Name()
-			daemonCmd := exec.Command(cmdName, "run")
-			daemonCmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
-			if err := daemonCmd.Start(); err != nil {
-				log.Logger().Fatalf("failed to start daemon process (command=%q run): %v", cmdName, err)
+	restartDaemonCmd = &cobra.Command{
+		Use:                   "restart",
+		Short:                 "Restart clipboard manager",
+		DisableFlagsInUseLine: true,
+		Run: func(cmd *cobra.Command, _ []string) {
+			if _, err := daemon.StopAll(); err != nil {
+				log.Logger().Fatal(err)
 			}
-			if err := daemonCmd.Process.Release(); err != nil {
-				log.Logger().Printf("failed to release daemon process: %v\n", err)
+			runDaemon(cmd)
+			if log.Verbose() {
+				log.Logger().Println("homie daemon restarted")
 			}
 		},
 	}
@@ -64,9 +80,6 @@ var (
 				log.Logger().Fatal(err)
 			}
 
-			if err := config.ReadConfig(); err != nil {
-				log.Logger().Println(err)
-			}
 			cfg := storage.CleanupConfig{
 				CleanUp: viper.GetBool("clean_up"),
 				TTL:     viper.GetInt("ttl"),
@@ -98,15 +111,31 @@ var (
 		Short:                 "Stop clipboard manager",
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, _ []string) {
-			if err := daemon.StopAll(); err != nil {
+			if _, err := daemon.StopAll(); err != nil {
 				log.Logger().Fatal(err)
+			}
+			if log.Verbose() {
+				log.Logger().Println("homie daemon stopped")
 			}
 		},
 	}
 )
 
+func runDaemon(cmd *cobra.Command) {
+	cmdName := cmd.Root().Name()
+	daemonCmd := exec.Command(cmdName, "run")
+	daemonCmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	if err := daemonCmd.Start(); err != nil {
+		log.Logger().Fatalf("failed to start daemon process (command=%q run): %v", cmdName, err)
+	}
+	if err := daemonCmd.Process.Release(); err != nil {
+		log.Logger().Printf("failed to release daemon process: %v\n", err)
+	}
+}
+
 func init() {
 	rootCmd.AddCommand(startDaemonCmd)
+	rootCmd.AddCommand(restartDaemonCmd)
 	rootCmd.AddCommand(runCmd)
 	rootCmd.AddCommand(stopCmd)
 }

@@ -1,5 +1,7 @@
 name: build
-on: [push]
+on:
+  push:
+  pull_request:
 
 jobs:
   build:
@@ -11,12 +13,18 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: 'go.mod'
-      - name: Install dependencies
+      - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libx11-dev xclip xsel
-          go get .
+      - name: Verify modules
+        run: go mod verify
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v7
+        with:
+          version: v2.11.4
+          args: --timeout=5m
       - name: Build
         run: go build -v ./...
-      - name: Test with the Go CLI
-        run: go test -v ./...
+      - name: Test (race)
+        run: go test -race ./...

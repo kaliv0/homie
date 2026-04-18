@@ -29,10 +29,14 @@ var (
 				log.Logger().Fatal(err)
 			}
 			if !ok {
-				log.Logger().Println("homie daemon is already running")
+				if log.Verbose() {
+					log.Logger().Println("homie daemon is already running")
+				}
 			} else {
 				runDaemon(cmd)
-				log.Logger().Println("homie daemon started")
+				if log.Verbose() {
+					log.Logger().Println("homie daemon started")
+				}
 			}
 		},
 	}
@@ -46,7 +50,9 @@ var (
 				log.Logger().Fatal(err)
 			}
 			runDaemon(cmd)
-			log.Logger().Println("homie daemon restarted")
+			if log.Verbose() {
+				log.Logger().Println("homie daemon restarted")
+			}
 		},
 	}
 
@@ -107,6 +113,9 @@ var (
 		Run: func(cmd *cobra.Command, _ []string) {
 			if _, err := daemon.StopAll(); err != nil {
 				log.Logger().Fatal(err)
+			}
+			if log.Verbose() {
+				log.Logger().Println("homie daemon stopped")
 			}
 		},
 	}

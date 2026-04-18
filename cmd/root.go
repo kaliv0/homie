@@ -47,8 +47,8 @@ var rootCmd = &cobra.Command{
 `}
 
 func init() {
-	rootCmd.PersistentFlags().CountP("verbose", "v", "adjust verbose level (e.g. -vv for debug)")
-	rootCmd.PersistentFlags().String("log-file", "", "append log output to given file")
+	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "enable verbose diagnostic messages")
+	rootCmd.PersistentFlags().String("log-file", "", "append logs to file")
 }
 
 // Execute runs the root cobra command.

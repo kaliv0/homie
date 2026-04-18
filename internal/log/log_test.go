@@ -14,39 +14,41 @@ import (
 )
 
 func TestConfigureVerbose(t *testing.T) {
-	t.Cleanup(func() { Configure(0, "") })
+	t.Cleanup(func() { Configure(false, "") })
 
-	Configure(2, "")
-	if Verbose() != 2 {
-		t.Fatalf("Verbose() = %d, want 2", Verbose())
+	Configure(true, "")
+	if !Verbose() {
+		t.Fatal("Verbose() = false, want true")
 	}
 
-	Configure(-1, "")
-	if Verbose() != 0 {
-		t.Fatalf("negative level should clamp to 0, got %d", Verbose())
+	Configure(false, "")
+	if Verbose() {
+		t.Fatal("Verbose() = true, want false")
 	}
 }
 
-func TestInfofDebugfNoPanic(t *testing.T) {
-	t.Cleanup(func() { Configure(0, "") })
-	Configure(0, "")
-	Infof("ignored at level 0\n")
-	Debugf("ignored at level 0\n")
+func TestLoggerNonNil(t *testing.T) {
+	t.Cleanup(func() { Configure(false, "") })
+	Configure(false, "")
+	if Logger() == nil {
+		t.Fatal("Logger() == nil")
+	}
 }
 
-func TestConfigureLogFileTee(t *testing.T) {
-	t.Cleanup(func() { Configure(0, "") })
+func TestConfigureLogFile(t *testing.T) {
+	t.Cleanup(func() { Configure(false, "") })
 
 	path := filepath.Join(t.TempDir(), "homie.log")
-	Configure(1, path)
-	Infof("info-line\n")
+	Configure(false, path)
+	Logger().Printf("info-line\n")
 
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := string(data); got != "homie: info-line\n" {
-		t.Fatalf("log file contents = %q, want homie: prefix + message", got)
+	got := string(data)
+	if !strings.Contains(got, "D'OH: ") || !strings.Contains(got, "info-line") {
+		t.Fatalf("log file contents = %q, want homie: prefix, file:line, and message", got)
 	}
 
 	if runtime.GOOS != "windows" {
@@ -61,13 +63,13 @@ func TestConfigureLogFileTee(t *testing.T) {
 }
 
 func TestConfigureSameLogPathReused(t *testing.T) {
-	t.Cleanup(func() { Configure(0, "") })
+	t.Cleanup(func() { Configure(false, "") })
 
 	path := filepath.Join(t.TempDir(), "homie.log")
-	Configure(1, path)
-	Infof("first\n")
-	Configure(2, path)
-	Debugf("second\n")
+	Configure(false, path)
+	Logger().Printf("first\n")
+	Configure(true, path)
+	Logger().Printf("second\n")
 
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -80,49 +82,49 @@ func TestConfigureSameLogPathReused(t *testing.T) {
 }
 
 func TestConfigureFromFlags_UsesConfigWhenFlagNotSet(t *testing.T) {
-	t.Cleanup(func() { Configure(0, "") })
-	viper.Set(config.ViperKeyVerbose, 1)
+	t.Cleanup(func() { Configure(false, "") })
+	viper.Set(config.ViperKeyVerbose, true)
 	viper.Set(config.ViperKeyLogFile, "")
 
 	cmd := &cobra.Command{Use: "test"}
-	cmd.Flags().CountP("verbose", "v", "verbosity")
+	cmd.Flags().BoolP("verbose", "v", false, "verbosity")
 	cmd.Flags().String("log-file", "", "log file")
 
 	ConfigureFromFlags(cmd.Flags())
-	if got := Verbose(); got != 1 {
-		t.Fatalf("Verbose() = %d, want 1", got)
+	if !Verbose() {
+		t.Fatal("Verbose() = false, want true")
 	}
 }
 
 func TestConfigureFromFlags_FlagOverridesConfig(t *testing.T) {
-	t.Cleanup(func() { Configure(0, "") })
-	viper.Set(config.ViperKeyVerbose, 0)
+	t.Cleanup(func() { Configure(false, "") })
+	viper.Set(config.ViperKeyVerbose, false)
 	viper.Set(config.ViperKeyLogFile, "")
 
 	cmd := &cobra.Command{Use: "test"}
-	cmd.Flags().CountP("verbose", "v", "verbosity")
+	cmd.Flags().BoolP("verbose", "v", false, "verbosity")
 	cmd.Flags().String("log-file", "", "log file")
-	if err := cmd.ParseFlags([]string{"-vv"}); err != nil {
+	if err := cmd.ParseFlags([]string{"-v"}); err != nil {
 		t.Fatal(err)
 	}
 
 	ConfigureFromFlags(cmd.Flags())
-	if got := Verbose(); got != 2 {
-		t.Fatalf("Verbose() = %d, want 2", got)
+	if !Verbose() {
+		t.Fatal("Verbose() = false, want true")
 	}
 }
 
 func TestConfigureFromFlags_ExpandsHomeInConfigLogFile(t *testing.T) {
-	t.Cleanup(func() { Configure(0, "") })
-	viper.Set(config.ViperKeyVerbose, 1)
+	t.Cleanup(func() { Configure(false, "") })
+	viper.Set(config.ViperKeyVerbose, true)
 	viper.Set(config.ViperKeyLogFile, "~/homie-configure-from-command.log")
 
 	cmd := &cobra.Command{Use: "test"}
-	cmd.Flags().CountP("verbose", "v", "verbosity")
+	cmd.Flags().BoolP("verbose", "v", false, "verbosity")
 	cmd.Flags().String("log-file", "", "log file")
 
 	ConfigureFromFlags(cmd.Flags())
-	Infof("hello\n")
+	Logger().Printf("hello\n")
 
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -133,5 +135,59 @@ func TestConfigureFromFlags_ExpandsHomeInConfigLogFile(t *testing.T) {
 
 	if _, err := os.Stat(path); err != nil {
 		t.Fatalf("expected expanded log file at %q: %v", path, err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "hello") {
+		t.Fatalf("log file = %q, want hello", string(data))
+	}
+}
+
+func TestConfigureFromFlags_ConfigVerboseAndLogFile_Tees(t *testing.T) {
+	t.Cleanup(func() { Configure(false, "") })
+	viper.Set(config.ViperKeyVerbose, true)
+	path := filepath.Join(t.TempDir(), "homie.log")
+	viper.Set(config.ViperKeyLogFile, path)
+
+	cmd := &cobra.Command{Use: "test"}
+	cmd.Flags().BoolP("verbose", "v", false, "verbosity")
+	cmd.Flags().String("log-file", "", "log file")
+
+	ConfigureFromFlags(cmd.Flags())
+	Logger().Printf("only-file\n")
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "only-file") {
+		t.Fatalf("expected log line in file, got %q", string(data))
+	}
+}
+
+func TestConfigureFromFlags_TeeWhenBothFlagsExplicit(t *testing.T) {
+	t.Cleanup(func() { Configure(false, "") })
+	viper.Set(config.ViperKeyVerbose, false)
+	path := filepath.Join(t.TempDir(), "homie.log")
+	viper.Set(config.ViperKeyLogFile, "")
+
+	cmd := &cobra.Command{Use: "test"}
+	cmd.Flags().BoolP("verbose", "v", false, "verbosity")
+	cmd.Flags().String("log-file", "", "log file")
+	if err := cmd.ParseFlags([]string{"-v", "--log-file", path}); err != nil {
+		t.Fatal(err)
+	}
+
+	ConfigureFromFlags(cmd.Flags())
+	Logger().Printf("tee-line\n")
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "tee-line") {
+		t.Fatalf("expected tee line in file, got %q", string(data))
 	}
 }

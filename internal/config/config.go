@@ -32,7 +32,7 @@ const (
 var ReadConfig = sync.OnceValue(readConfig)
 
 func readConfig() error {
-	viper.SetDefault(ViperKeyVerbose, 0)
+	viper.SetDefault(ViperKeyVerbose, false)
 	viper.SetDefault(ViperKeyLogFile, "")
 
 	viper.SetConfigName(confFileName)

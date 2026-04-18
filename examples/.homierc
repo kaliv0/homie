@@ -4,5 +4,5 @@ ttl: 7                               # retention period in days
 clean_up: false                      # skip clean_up step entirely
 use_xclip: true                      # use xclip for clipboard text management on linux
 #use_xsel: false                     # use xsel for the same reason
-#verbose: 1                          # default verbosity when -v/--verbose flag is omitted
+#verbose: true                       # default when -v/--verbose is omitted
 #log_file: ~/.local/state/homie.log  # append logs here (file permissions -> 0o600)

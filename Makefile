@@ -1,6 +1,6 @@
 GOLANGCI_VERSION ?= v2.11.4
 
-.PHONY: help mod-verify vet lint staticcheck build test test-race ci
+.PHONY: help mod-verify vet lint staticcheck build test test-race all
 
 help:
 	@echo "Targets:"
@@ -11,7 +11,7 @@ help:
 	@echo "  build        go build -v ./..."
 	@echo "  test         go test ./..."
 	@echo "  test-race    go test -race ./..."
-	@echo "  ci           mod-verify, lint, build, test-race"
+	@echo "  all          mod-verify, lint, build, test-race"
 
 mod-verify:
 	go mod verify
@@ -34,4 +34,4 @@ test:
 test-race:
 	go test -race ./...
 
-ci: mod-verify lint build test-race
+all: mod-verify lint build test-race

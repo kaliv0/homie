@@ -24,19 +24,29 @@ var (
 		Short:                 "Start clipboard manager",
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, _ []string) {
-			if err := daemon.StopAll(); err != nil {
-				log.Logger().Println(err)
+			ok, err := daemon.CheckAll()
+			if err != nil {
+				log.Logger().Fatal(err)
 			}
+			if !ok {
+				log.Logger().Println("homie daemon is already running")
+			} else {
+				runDaemon(cmd)
+				log.Logger().Println("homie daemon started")
+			}
+		},
+	}
 
-			cmdName := cmd.Root().Name()
-			daemonCmd := exec.Command(cmdName, "run")
-			daemonCmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
-			if err := daemonCmd.Start(); err != nil {
-				log.Logger().Fatalf("failed to start daemon process (command=%q run): %v", cmdName, err)
+	restartDaemonCmd = &cobra.Command{
+		Use:                   "restart",
+		Short:                 "Restart clipboard manager",
+		DisableFlagsInUseLine: true,
+		Run: func(cmd *cobra.Command, _ []string) {
+			if _, err := daemon.StopAll(); err != nil {
+				log.Logger().Fatal(err)
 			}
-			if err := daemonCmd.Process.Release(); err != nil {
-				log.Logger().Printf("failed to release daemon process: %v\n", err)
-			}
+			runDaemon(cmd)
+			log.Logger().Println("homie daemon restarted")
 		},
 	}
 
@@ -95,15 +105,28 @@ var (
 		Short:                 "Stop clipboard manager",
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, _ []string) {
-			if err := daemon.StopAll(); err != nil {
+			if _, err := daemon.StopAll(); err != nil {
 				log.Logger().Fatal(err)
 			}
 		},
 	}
 )
 
+func runDaemon(cmd *cobra.Command) {
+	cmdName := cmd.Root().Name()
+	daemonCmd := exec.Command(cmdName, "run")
+	daemonCmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	if err := daemonCmd.Start(); err != nil {
+		log.Logger().Fatalf("failed to start daemon process (command=%q run): %v", cmdName, err)
+	}
+	if err := daemonCmd.Process.Release(); err != nil {
+		log.Logger().Printf("failed to release daemon process: %v\n", err)
+	}
+}
+
 func init() {
 	rootCmd.AddCommand(startDaemonCmd)
+	rootCmd.AddCommand(restartDaemonCmd)
 	rootCmd.AddCommand(runCmd)
 	rootCmd.AddCommand(stopCmd)
 }

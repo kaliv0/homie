@@ -26,7 +26,6 @@ const (
 
 	confFileName = ".homierc"
 	confFileType = "yaml"
-
 )
 
 // ReadConfig loads configuration from ~/.homierc once.

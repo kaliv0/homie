@@ -89,7 +89,8 @@ func (r *Repository) AutoMigrate() error {
 	}
 	// Create index on time_stamp for better query performance
 	_, err = r.db.Exec(`
-		CREATE INDEX IF NOT EXISTS idx_time_stamp ON clipboard_items(time_stamp)
+		CREATE INDEX IF NOT EXISTS idx_time_stamp ON clipboard_items(time_stamp);
+		CREATE INDEX IF NOT EXISTS idx_text_hash ON clipboard_items(text_hash)
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to create index idx_time_stamp on clipboard_items: %w", err)

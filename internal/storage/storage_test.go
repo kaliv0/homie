@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -103,6 +104,43 @@ func TestAutoMigrate(t *testing.T) {
 	err = repo.db.Get(&indexName, `SELECT name FROM sqlite_master WHERE type='index' AND name='idx_time_stamp'`)
 	if err != nil {
 		t.Fatalf("expected idx_time_stamp index to exist: %v", err)
+	}
+}
+
+func TestAutoMigrate_setsUnixFilePermissions(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip()
+	}
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "perm.db")
+
+	repo, err := NewRepository(dbPath)
+	if err != nil {
+		t.Fatalf("NewRepository: %v", err)
+	}
+	defer func() { _ = repo.Close() }()
+
+	if err := repo.AutoMigrate(); err != nil {
+		t.Fatalf("AutoMigrate: %v", err)
+	}
+	if err := repo.SetDBFilesPermissions(); err != nil {
+		t.Fatalf("SetDBFilesPermissions: %v", err)
+	}
+
+	for _, path := range []string{dbPath, dbPath + "-wal", dbPath + "-shm"} {
+		info, err := os.Stat(path)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			t.Fatal(err)
+		}
+		if info.IsDir() {
+			continue
+		}
+		if perm := info.Mode().Perm(); perm != 0o600 {
+			t.Errorf("%q: expected mode 0600, got %04o", path, perm)
+		}
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"os"
 	"strconv"
 	"time"
 
@@ -16,13 +17,17 @@ import (
 const (
 	DefaultLimit   = 20
 	DefaultMaxSize = 500
+)
 
+const (
 	maxDbConnections = 2
 	connMaxTimespan  = 5 * time.Minute
 	dbBusyTimeout    = 5000 // 5s in milliseconds
 	journalMode      = "WAL"
 	dbSync           = "NORMAL"
 )
+
+const dbFilePerm = 0o600
 
 // ClipboardItem represents a clipboard entry persisted in the database.
 type ClipboardItem struct {
@@ -34,7 +39,8 @@ type ClipboardItem struct {
 
 // Repository wraps database access for clipboard items.
 type Repository struct {
-	db *sqlx.DB
+	db     *sqlx.DB
+	dbPath string
 }
 
 // NewRepository opens the SQLite database at dbPath.
@@ -71,7 +77,7 @@ func NewRepository(dbPath string) (*Repository, error) {
 		}
 	}
 
-	return &Repository{db}, nil
+	return &Repository{db, dbPath}, nil
 }
 
 // AutoMigrate creates the clipboard_items table if it doesn't exist.
@@ -94,6 +100,22 @@ func (r *Repository) AutoMigrate() error {
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to create index idx_time_stamp on clipboard_items: %w", err)
+	}
+	return nil
+}
+
+// SetDBFilesPermissions sets mode 0600 on the database file and on WAL sidecars (-wal, -shm).
+func (r *Repository) SetDBFilesPermissions() error {
+	if r.dbPath == "" {
+		return nil
+	}
+	paths := []string{r.dbPath, r.dbPath + "-wal", r.dbPath + "-shm"}
+	for i, path := range paths {
+		err := os.Chmod(path, dbFilePerm)
+		if err == nil || (os.IsNotExist(err) && i > 0) {
+			continue
+		}
+		return fmt.Errorf("chmod %q to %d: %w", path, dbFilePerm, err)
 	}
 	return nil
 }

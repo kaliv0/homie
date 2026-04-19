@@ -108,9 +108,13 @@ func clipboardTool() string {
 	if runtime.GOOS != "linux" {
 		return ""
 	}
-	for _, tool := range []string{"xclip", "xsel"} {
+	for tool, cmd := range map[string]string{
+		"xclip":        "xclip",
+		"xsel":         "xsel",
+		"wl-clipboard": "wl-copy",
+	} {
 		if viper.GetBool("use_" + tool) {
-			if _, err := exec.LookPath(tool); err != nil {
+			if _, err := exec.LookPath(cmd); err != nil {
 				log.Logger().Printf("%s not found: %v\n", tool, err)
 			}
 			return tool

@@ -47,6 +47,19 @@ func trackClosed(t *testing.T, writer Writer, items ...[]byte) error {
 	return TrackClipboard(t.Context(), writer, ch)
 }
 
+// assertTrackClipboardDone waits for TrackClipboard to finish and expects a nil error.
+func assertTrackClipboardDone(t *testing.T, done <-chan error, waitMsg string) {
+	t.Helper()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("expected nil error, got %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal(waitMsg)
+	}
+}
+
 func TestTrackClipboard_ReceivesItems(t *testing.T) {
 	t.Parallel()
 
@@ -81,14 +94,7 @@ func TestTrackClipboard_ContextCancellation(t *testing.T) {
 
 	cancel()
 
-	select {
-	case err := <-done:
-		if err != nil {
-			t.Fatalf("expected nil error on context cancel, got %v", err)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("TrackClipboard did not return after context cancellation")
-	}
+	assertTrackClipboardDone(t, done, "TrackClipboard did not return after context cancellation")
 }
 
 func TestTrackClipboard_ChannelClose(t *testing.T) {
@@ -103,14 +109,7 @@ func TestTrackClipboard_ChannelClose(t *testing.T) {
 
 	close(ch)
 
-	select {
-	case err := <-done:
-		if err != nil {
-			t.Fatalf("expected nil error on channel close, got %v", err)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("TrackClipboard did not return after channel close")
-	}
+	assertTrackClipboardDone(t, done, "TrackClipboard did not return after channel close")
 }
 
 func TestTrackClipboard_WriteError(t *testing.T) {
@@ -197,14 +196,7 @@ func TestTrackClipboard_ContextCancelDuringItems(t *testing.T) {
 	ch <- []byte("before-cancel")
 	cancel()
 
-	select {
-	case err := <-done:
-		if err != nil {
-			t.Fatalf("expected nil error, got %v", err)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("TrackClipboard did not exit after cancel")
-	}
+	assertTrackClipboardDone(t, done, "TrackClipboard did not exit after cancel")
 
 	if len(writer.items) != 1 {
 		t.Errorf("expected 1 item processed before cancel, got %d", len(writer.items))

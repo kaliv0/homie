@@ -67,6 +67,16 @@ func assertCount(t *testing.T, repo *Repository, expected int) {
 	}
 }
 
+// mustRead calls repo.Read and fails the test on error.
+func mustRead(t *testing.T, repo *Repository, offset, limit int) []ClipboardItem {
+	t.Helper()
+	items, err := repo.Read(offset, limit)
+	if err != nil {
+		t.Fatalf("Read(%d, %d) failed: %v", offset, limit, err)
+	}
+	return items
+}
+
 func TestNewRepository(t *testing.T) {
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "test.db")
@@ -75,9 +85,7 @@ func TestNewRepository(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	defer func() {
-		_ = repo.Close()
-	}()
+	t.Cleanup(func() { _ = repo.Close() })
 
 	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
 		t.Fatalf("expected database file to be created at %q", dbPath)
@@ -107,7 +115,7 @@ func TestAutoMigrate(t *testing.T) {
 	}
 }
 
-func TestAutoMigrate_setsUnixFilePermissions(t *testing.T) {
+func TestSetDBFilesPermissions(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip()
 	}
@@ -118,7 +126,7 @@ func TestAutoMigrate_setsUnixFilePermissions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewRepository: %v", err)
 	}
-	defer func() { _ = repo.Close() }()
+	t.Cleanup(func() { _ = repo.Close() })
 
 	if err := repo.AutoMigrate(); err != nil {
 		t.Fatalf("AutoMigrate: %v", err)
@@ -135,9 +143,6 @@ func TestAutoMigrate_setsUnixFilePermissions(t *testing.T) {
 			}
 			t.Fatal(err)
 		}
-		if info.IsDir() {
-			continue
-		}
 		if perm := info.Mode().Perm(); perm != 0o600 {
 			t.Errorf("%q: expected mode 0600, got %04o", path, perm)
 		}
@@ -151,10 +156,7 @@ func TestWrite_Insert(t *testing.T) {
 		t.Fatalf("Write() failed: %v", err)
 	}
 
-	items, err := repo.Read(0, 10)
-	if err != nil {
-		t.Fatalf("Read() failed: %v", err)
-	}
+	items := mustRead(t, repo, 0, 10)
 	if len(items) != 1 {
 		t.Fatalf("expected 1 item, got %d", len(items))
 	}
@@ -183,10 +185,7 @@ func TestWrite_EmptyItem(t *testing.T) {
 		t.Fatalf("Write(empty) failed: %v", err)
 	}
 
-	items, err := repo.Read(0, 10)
-	if err != nil {
-		t.Fatalf("Read() failed: %v", err)
-	}
+	items := mustRead(t, repo, 0, 10)
 	if len(items) != 1 || items[0].ClipText != "" {
 		t.Errorf("expected 1 empty item, got %v", items)
 	}
@@ -200,10 +199,7 @@ func TestWrite_LargeItem(t *testing.T) {
 		t.Fatalf("Write(large) failed: %v", err)
 	}
 
-	items, err := repo.Read(0, 10)
-	if err != nil {
-		t.Fatalf("Read() failed: %v", err)
-	}
+	items := mustRead(t, repo, 0, 10)
 	if len(items) != 1 || len(items[0].ClipText) != 10000 {
 		t.Errorf("expected 1 item of 10000 chars, got %d items", len(items))
 	}
@@ -215,13 +211,13 @@ func TestWrite_DuplicateUpdatesTimestamp(t *testing.T) {
 	if err := repo.Write([]byte("same")); err != nil {
 		t.Fatalf("first Write() failed: %v", err)
 	}
-	items1, _ := repo.Read(0, 10)
+	items1 := mustRead(t, repo, 0, 10)
 	ts1 := items1[0].TimeStamp
 
 	if err := repo.Write([]byte("same")); err != nil {
 		t.Fatalf("second Write() failed: %v", err)
 	}
-	items2, _ := repo.Read(0, 10)
+	items2 := mustRead(t, repo, 0, 10)
 	ts2 := items2[0].TimeStamp
 
 	if !ts2.After(ts1) {
@@ -264,10 +260,7 @@ func TestRead_Ordering(t *testing.T) {
 	repo := setupTestDB(t)
 	seedItems(t, repo, 3)
 
-	items, err := repo.Read(0, 10)
-	if err != nil {
-		t.Fatalf("Read() failed: %v", err)
-	}
+	items := mustRead(t, repo, 0, 10)
 	if len(items) != 3 {
 		t.Fatalf("expected 3 items, got %d", len(items))
 	}
@@ -300,10 +293,7 @@ func TestRead_Limits(t *testing.T) {
 			repo := setupTestDB(t)
 			seedItems(t, repo, tt.numItems)
 
-			items, err := repo.Read(tt.offset, tt.limit)
-			if err != nil {
-				t.Fatalf("Read(%d, %d) failed: %v", tt.offset, tt.limit, err)
-			}
+			items := mustRead(t, repo, tt.offset, tt.limit)
 			if len(items) != tt.wantLen {
 				t.Errorf("expected %d items, got %d", tt.wantLen, len(items))
 			}
@@ -315,14 +305,8 @@ func TestRead_Pagination(t *testing.T) {
 	repo := setupTestDB(t)
 	seedItems(t, repo, 5)
 
-	page1, err := repo.Read(0, 2)
-	if err != nil {
-		t.Fatalf("Read(0, 2) failed: %v", err)
-	}
-	page2, err := repo.Read(2, 2)
-	if err != nil {
-		t.Fatalf("Read(2, 2) failed: %v", err)
-	}
+	page1 := mustRead(t, repo, 0, 2)
+	page2 := mustRead(t, repo, 2, 2)
 
 	if len(page1) != 2 || len(page2) != 2 {
 		t.Fatalf("expected 2 items per page, got %d and %d", len(page1), len(page2))
@@ -338,10 +322,7 @@ func TestRead_PaginationConsistency(t *testing.T) {
 
 	var all []ClipboardItem
 	for offset := 0; offset < 10; offset += 3 {
-		page, err := repo.Read(offset, 3)
-		if err != nil {
-			t.Fatalf("Read(%d, 3) failed: %v", offset, err)
-		}
+		page := mustRead(t, repo, offset, 3)
 		all = append(all, page...)
 	}
 
@@ -428,22 +409,25 @@ func TestDeleteOldest(t *testing.T) {
 }
 
 func TestReset(t *testing.T) {
-	repo := setupTestDB(t)
-	seedItems(t, repo, 3)
-
-	if err := repo.Reset(); err != nil {
-		t.Fatalf("Reset() failed: %v", err)
+	tests := []struct {
+		name  string
+		seedN int
+	}{
+		{"clears rows", 3},
+		{"empty table", 0},
 	}
-	assertCount(t, repo, 0)
-}
-
-func TestReset_AlreadyEmpty(t *testing.T) {
-	repo := setupTestDB(t)
-
-	if err := repo.Reset(); err != nil {
-		t.Fatalf("Reset() on empty table failed: %v", err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := setupTestDB(t)
+			if tt.seedN > 0 {
+				seedItems(t, repo, tt.seedN)
+			}
+			if err := repo.Reset(); err != nil {
+				t.Fatalf("Reset() failed: %v", err)
+			}
+			assertCount(t, repo, 0)
+		})
 	}
-	assertCount(t, repo, 0)
 }
 
 func TestReset_ThenWrite(t *testing.T) {
@@ -459,10 +443,7 @@ func TestReset_ThenWrite(t *testing.T) {
 		t.Fatalf("Write() after reset failed: %v", err)
 	}
 
-	items, err := repo.Read(0, 10)
-	if err != nil {
-		t.Fatalf("Read() failed: %v", err)
-	}
+	items := mustRead(t, repo, 0, 10)
 	if len(items) != 1 || items[0].ClipText != "after-reset" {
 		t.Errorf("expected single item %q, got %v", "after-reset", items)
 	}
@@ -575,10 +556,7 @@ func TestDeleteExcess_DeletesOldestRowsFirst(t *testing.T) {
 		t.Fatalf("DeleteExcess(2) failed: %v", err)
 	}
 
-	items, err := repo.Read(0, 10)
-	if err != nil {
-		t.Fatalf("Read() failed: %v", err)
-	}
+	items := mustRead(t, repo, 0, 10)
 	if len(items) != 3 {
 		t.Fatalf("expected 3 items after deleting 2 oldest, got %d", len(items))
 	}
@@ -626,10 +604,7 @@ func TestCleanOldHistory_MaxSizeKeepsNewestRows(t *testing.T) {
 		t.Fatalf("CleanOldHistory() failed: %v", err)
 	}
 
-	items, err := repo.Read(0, 10)
-	if err != nil {
-		t.Fatalf("Read() failed: %v", err)
-	}
+	items := mustRead(t, repo, 0, 10)
 	if len(items) != 5 {
 		t.Fatalf("expected 5 items, got %d", len(items))
 	}

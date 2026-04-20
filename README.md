@@ -19,7 +19,7 @@ Supports <i>fuzzy search</i>, <i>multi-select</i> and other adorable <i>chicaner
 ```shell
 go install github.com/kaliv0/homie@latest
 ```
-On `linux` you would also need `xclip` or `xsel` installed as an external dependency
+On `linux` you would also need `xclip`, `xsel` or `wl-clipboard` installed as an external dependency
 
 ---
 

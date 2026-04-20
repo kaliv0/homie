@@ -62,6 +62,16 @@ func assertDaemonStopped(t *testing.T, lister *mockProcessLister) {
 	}
 }
 
+// mustProcessDaemonsCheck runs ProcessDaemons(lister, false) and returns ok, failing on error.
+func mustProcessDaemonsCheck(t *testing.T, lister *mockProcessLister) bool {
+	t.Helper()
+	ok, err := ProcessDaemons(lister, false)
+	if err != nil {
+		t.Fatalf("ProcessDaemons(stop=false): %v", err)
+	}
+	return ok
+}
+
 func TestProcessDaemons_Stop_TerminatesOtherHomieRun(t *testing.T) {
 	t.Parallel()
 	other := &mockProcess{name: "homie", pid: 200}
@@ -279,11 +289,7 @@ func TestProcessDaemons_Stop_OnlySelf(t *testing.T) {
 func TestProcessDaemons_Check_NoOtherDaemon(t *testing.T) {
 	t.Parallel()
 	self := &mockProcess{name: "homie", pid: 100}
-	ok, err := ProcessDaemons(newLister(self), false)
-	if err != nil {
-		t.Fatalf("ProcessDaemons(stop=false): %v", err)
-	}
-	if !ok {
+	if !mustProcessDaemonsCheck(t, newLister(self)) {
 		t.Fatal("expected ok=true when no other homie run exists")
 	}
 }
@@ -291,11 +297,7 @@ func TestProcessDaemons_Check_NoOtherDaemon(t *testing.T) {
 func TestProcessDaemons_Check_OtherDaemonRunning(t *testing.T) {
 	t.Parallel()
 	other := &mockProcess{name: "homie", pid: 200}
-	ok, err := ProcessDaemons(newLister(other), false)
-	if err != nil {
-		t.Fatalf("ProcessDaemons(stop=false): %v", err)
-	}
-	if ok {
+	if mustProcessDaemonsCheck(t, newLister(other)) {
 		t.Fatal("expected ok=false when another homie run is present")
 	}
 }
@@ -303,11 +305,7 @@ func TestProcessDaemons_Check_OtherDaemonRunning(t *testing.T) {
 func TestProcessDaemons_Check_SkipsNonRunHomie(t *testing.T) {
 	t.Parallel()
 	other := &mockProcess{name: "homie", pid: 200, args: []string{"homie", "start"}}
-	ok, err := ProcessDaemons(newLister(other), false)
-	if err != nil {
-		t.Fatalf("ProcessDaemons(stop=false): %v", err)
-	}
-	if !ok {
+	if !mustProcessDaemonsCheck(t, newLister(other)) {
 		t.Fatal("homie without run should not block check")
 	}
 }
@@ -316,11 +314,7 @@ func TestProcessDaemons_Check_FirstConflictShortCircuits(t *testing.T) {
 	t.Parallel()
 	a := &mockProcess{name: "homie", pid: 200}
 	b := &mockProcess{name: "homie", pid: 300}
-	ok, err := ProcessDaemons(newLister(a, b), false)
-	if err != nil {
-		t.Fatalf("ProcessDaemons(stop=false): %v", err)
-	}
-	if ok {
+	if mustProcessDaemonsCheck(t, newLister(a, b)) {
 		t.Fatal("expected conflict when multiple other daemons")
 	}
 }

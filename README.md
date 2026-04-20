@@ -30,7 +30,7 @@ homie start
 ```
 
 Runs <i>homie</i> in a daemon process to track your clipboard.<br>
-It stores all copied items in a sqlite3 `homie.db` file under <i>\$XDG_CONFIG_HOME/</i> or <i>\$HOME/.config/</i> path.
+It stores all copied items in a sqlite3 `homie.db` file under <i>\$XDG_CONFIG_HOME/homie/</i> or <i>\$HOME/.config/homie/</i>.
 
 ```shell
 homie stop

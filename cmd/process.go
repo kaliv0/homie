@@ -79,6 +79,10 @@ var (
 				_ = db.Close()
 				log.Logger().Fatal(err)
 			}
+			if err := db.SetDBFilesPermissions(); err != nil {
+				_ = db.Close()
+				log.Logger().Fatal(err)
+			}
 
 			cfg := storage.CleanupConfig{
 				CleanUp: viper.GetBool("clean_up"),

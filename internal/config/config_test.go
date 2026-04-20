@@ -27,6 +27,14 @@ func mustDBPath(t *testing.T) string {
 	return path
 }
 
+// useLiveReadConfig makes each ReadConfig() call invoke readConfig directly (bypassing sync.Once)
+// so tests can reload config; restored after the test.
+func useLiveReadConfig(t *testing.T) {
+	t.Helper()
+	ReadConfig = func() error { return readConfig() }
+	t.Cleanup(func() { ReadConfig = sync.OnceValue(readConfig) })
+}
+
 func TestDBPath_WithXDG(t *testing.T) {
 	tmpDir := t.TempDir()
 	resetDBPath(t, tmpDir)
@@ -135,9 +143,7 @@ func TestDBPath_XDGWithNestedPath(t *testing.T) {
 }
 
 func TestReadConfig_NoFile(t *testing.T) {
-	ReadConfig = func() error {
-		return readConfig()
-	}
+	useLiveReadConfig(t)
 
 	tmpDir := t.TempDir()
 	t.Setenv("HOME", tmpDir)
@@ -151,9 +157,7 @@ func TestReadConfig_NoFile(t *testing.T) {
 }
 
 func TestReadConfig_WithValidFile(t *testing.T) {
-	ReadConfig = func() error {
-		return readConfig()
-	}
+	useLiveReadConfig(t)
 
 	tmpDir := t.TempDir()
 	t.Setenv("HOME", tmpDir)
@@ -169,9 +173,7 @@ func TestReadConfig_WithValidFile(t *testing.T) {
 }
 
 func TestReadConfig_WithInvalidYAML(t *testing.T) {
-	ReadConfig = func() error {
-		return readConfig()
-	}
+	useLiveReadConfig(t)
 
 	tmpDir := t.TempDir()
 	t.Setenv("HOME", tmpDir)

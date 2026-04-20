@@ -13,8 +13,22 @@ import (
 	"github.com/kaliv0/homie/internal/config"
 )
 
-func TestConfigureVerbose(t *testing.T) {
+// testCmdWithLogFlags returns a cobra command with the same logging flags as the homie CLI.
+func testCmdWithLogFlags() *cobra.Command {
+	cmd := &cobra.Command{Use: "test"}
+	cmd.Flags().BoolP("verbose", "v", false, "verbosity")
+	cmd.Flags().String("log-file", "", "log file")
+	return cmd
+}
+
+// resetLogAfterTest restores the default logger after the test (verbose off, no log file).
+func resetLogAfterTest(t *testing.T) {
+	t.Helper()
 	t.Cleanup(func() { Configure(false, "") })
+}
+
+func TestConfigureVerbose(t *testing.T) {
+	resetLogAfterTest(t)
 
 	Configure(true, "")
 	if !Verbose() {
@@ -28,7 +42,7 @@ func TestConfigureVerbose(t *testing.T) {
 }
 
 func TestLoggerNonNil(t *testing.T) {
-	t.Cleanup(func() { Configure(false, "") })
+	resetLogAfterTest(t)
 	Configure(false, "")
 	if Logger() == nil {
 		t.Fatal("Logger() == nil")
@@ -36,7 +50,7 @@ func TestLoggerNonNil(t *testing.T) {
 }
 
 func TestConfigureLogFile(t *testing.T) {
-	t.Cleanup(func() { Configure(false, "") })
+	resetLogAfterTest(t)
 
 	path := filepath.Join(t.TempDir(), "homie.log")
 	Configure(false, path)
@@ -63,7 +77,7 @@ func TestConfigureLogFile(t *testing.T) {
 }
 
 func TestConfigureSameLogPathReused(t *testing.T) {
-	t.Cleanup(func() { Configure(false, "") })
+	resetLogAfterTest(t)
 
 	path := filepath.Join(t.TempDir(), "homie.log")
 	Configure(false, path)
@@ -82,14 +96,11 @@ func TestConfigureSameLogPathReused(t *testing.T) {
 }
 
 func TestConfigureFromFlags_UsesConfigWhenFlagNotSet(t *testing.T) {
-	t.Cleanup(func() { Configure(false, "") })
+	resetLogAfterTest(t)
 	viper.Set(config.ViperKeyVerbose, true)
 	viper.Set(config.ViperKeyLogFile, "")
 
-	cmd := &cobra.Command{Use: "test"}
-	cmd.Flags().BoolP("verbose", "v", false, "verbosity")
-	cmd.Flags().String("log-file", "", "log file")
-
+	cmd := testCmdWithLogFlags()
 	ConfigureFromFlags(cmd.Flags())
 	if !Verbose() {
 		t.Fatal("Verbose() = false, want true")
@@ -97,13 +108,11 @@ func TestConfigureFromFlags_UsesConfigWhenFlagNotSet(t *testing.T) {
 }
 
 func TestConfigureFromFlags_FlagOverridesConfig(t *testing.T) {
-	t.Cleanup(func() { Configure(false, "") })
+	resetLogAfterTest(t)
 	viper.Set(config.ViperKeyVerbose, false)
 	viper.Set(config.ViperKeyLogFile, "")
 
-	cmd := &cobra.Command{Use: "test"}
-	cmd.Flags().BoolP("verbose", "v", false, "verbosity")
-	cmd.Flags().String("log-file", "", "log file")
+	cmd := testCmdWithLogFlags()
 	if err := cmd.ParseFlags([]string{"-v"}); err != nil {
 		t.Fatal(err)
 	}
@@ -115,14 +124,11 @@ func TestConfigureFromFlags_FlagOverridesConfig(t *testing.T) {
 }
 
 func TestConfigureFromFlags_ExpandsHomeInConfigLogFile(t *testing.T) {
-	t.Cleanup(func() { Configure(false, "") })
+	resetLogAfterTest(t)
 	viper.Set(config.ViperKeyVerbose, true)
 	viper.Set(config.ViperKeyLogFile, "~/homie-configure-from-command.log")
 
-	cmd := &cobra.Command{Use: "test"}
-	cmd.Flags().BoolP("verbose", "v", false, "verbosity")
-	cmd.Flags().String("log-file", "", "log file")
-
+	cmd := testCmdWithLogFlags()
 	ConfigureFromFlags(cmd.Flags())
 	Logger().Printf("hello\n")
 
@@ -146,15 +152,12 @@ func TestConfigureFromFlags_ExpandsHomeInConfigLogFile(t *testing.T) {
 }
 
 func TestConfigureFromFlags_ConfigVerboseAndLogFile_Tees(t *testing.T) {
-	t.Cleanup(func() { Configure(false, "") })
+	resetLogAfterTest(t)
 	viper.Set(config.ViperKeyVerbose, true)
 	path := filepath.Join(t.TempDir(), "homie.log")
 	viper.Set(config.ViperKeyLogFile, path)
 
-	cmd := &cobra.Command{Use: "test"}
-	cmd.Flags().BoolP("verbose", "v", false, "verbosity")
-	cmd.Flags().String("log-file", "", "log file")
-
+	cmd := testCmdWithLogFlags()
 	ConfigureFromFlags(cmd.Flags())
 	Logger().Printf("only-file\n")
 
@@ -168,14 +171,12 @@ func TestConfigureFromFlags_ConfigVerboseAndLogFile_Tees(t *testing.T) {
 }
 
 func TestConfigureFromFlags_TeeWhenBothFlagsExplicit(t *testing.T) {
-	t.Cleanup(func() { Configure(false, "") })
+	resetLogAfterTest(t)
 	viper.Set(config.ViperKeyVerbose, false)
 	path := filepath.Join(t.TempDir(), "homie.log")
 	viper.Set(config.ViperKeyLogFile, "")
 
-	cmd := &cobra.Command{Use: "test"}
-	cmd.Flags().BoolP("verbose", "v", false, "verbosity")
-	cmd.Flags().String("log-file", "", "log file")
+	cmd := testCmdWithLogFlags()
 	if err := cmd.ParseFlags([]string{"-v", "--log-file", path}); err != nil {
 		t.Fatal(err)
 	}

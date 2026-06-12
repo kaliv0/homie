@@ -53,8 +53,8 @@ func NewRepository(dbPath string) (*Repository, error) {
 
 	// verify connection
 	if err = db.Ping(); err != nil {
-		_ = db.Close()
-		return nil, fmt.Errorf("failed to ping database at %q: %w", dbPath, err)
+		closeErr := db.Close()
+		return nil, errors.Join(fmt.Errorf("failed to ping database at %q: %w", dbPath, err), closeErr)
 	}
 
 	// set SQLite connection pool settings suited for a single-file DB

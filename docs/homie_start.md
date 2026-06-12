@@ -12,8 +12,7 @@ homie start
 - `No daemon running`: starts the background daemon.
 - `Daemon already running`: prints `homie daemon is already running` and exits successfully.
 
-A `daemon` is any process whose executable name is `homie` and whose command line has `run` as the second argument (the hidden daemon entrypoint).<br>
-Other homie commands are not affected.
+The daemon coordinates via a pidfile (default `$XDG_RUNTIME_DIR/homie.pid`, with fallbacks — see `homie status`).
 
 ### Options
 
@@ -26,3 +25,4 @@ Other homie commands are not affected.
 * [homie](homie.md)	 - Terminal-based clipboard manager
 * [homie stop](homie_stop.md)	 - Stop clipboard manager
 * [homie restart](homie_restart.md)	 - Restart clipboard manager
+* [homie status](homie_status.md)	 - Show daemon status

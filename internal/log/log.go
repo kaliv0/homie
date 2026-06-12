@@ -5,7 +5,6 @@ import (
 	"io"
 	"log"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 
@@ -23,14 +22,14 @@ const (
 const (
 	verboseConfig = "verbose"
 	fileConfig    = "log-file"
-	homeDirPrefix = "~/"
-	logPrefix = "D'OH: "
+	logPrefix     = "D'OH: "
 )
 
 var (
 	mu      sync.RWMutex
 	std     *log.Logger
 	verbose bool
+
 	logFile *os.File
 	logPath string // path of the open logFile; empty if none
 )
@@ -54,19 +53,8 @@ func ConfigureFromFlags(pflags *pflag.FlagSet) {
 	} else {
 		filePath = viper.GetString(config.ViperKeyLogFile)
 	}
-	expandedPath := expandPath(strings.TrimSpace(filePath))
+	expandedPath := config.ExpandHomePath(strings.TrimSpace(filePath))
 	Configure(verboseEnabled, expandedPath)
-}
-
-func expandPath(p string) string {
-	if p == "" || !strings.HasPrefix(p, homeDirPrefix) {
-		return p
-	}
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return p
-	}
-	return filepath.Join(homeDir, strings.TrimPrefix(p, homeDirPrefix))
 }
 
 // Configure sets verbose diagnostics, an optional append-only log file (0o600), and tee (stderr + file).

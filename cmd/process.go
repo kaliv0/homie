@@ -2,7 +2,9 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"os/signal"
 	"syscall"
@@ -24,19 +26,19 @@ var (
 		Short:                 "Start clipboard manager",
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, _ []string) {
-			ok, err := daemon.CheckAll()
+			running, _, err := daemon.Status()
 			if err != nil {
 				log.Logger().Fatal(err)
 			}
-			if !ok {
+			if running {
 				if log.Verbose() {
 					log.Logger().Println("homie daemon is already running")
 				}
-			} else {
-				runDaemon(cmd)
-				if log.Verbose() {
-					log.Logger().Println("homie daemon started")
-				}
+				return
+			}
+			runDaemon(cmd)
+			if log.Verbose() {
+				log.Logger().Println("homie daemon started")
 			}
 		},
 	}
@@ -46,7 +48,7 @@ var (
 		Short:                 "Restart clipboard manager",
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, _ []string) {
-			if _, err := daemon.StopAll(); err != nil {
+			if err := daemon.Stop(); err != nil {
 				log.Logger().Fatal(err)
 			}
 			runDaemon(cmd)
@@ -60,6 +62,22 @@ var (
 		Use:    "run",
 		Hidden: true,
 		Run: func(cmd *cobra.Command, _ []string) {
+			lock, err := daemon.Acquire()
+			if err != nil {
+				if errors.Is(err, daemon.ErrAlreadyRunning) {
+					if log.Verbose() {
+						log.Logger().Println("homie daemon is already running")
+					}
+					os.Exit(1)
+				}
+				log.Logger().Fatal(err)
+			}
+			defer func() {
+				if releaseErr := lock.Release(); releaseErr != nil {
+					log.Logger().Println(releaseErr)
+				}
+			}()
+
 			dbPath, err := config.DBPath()
 			if err != nil {
 				log.Logger().Fatal(err)
@@ -115,12 +133,29 @@ var (
 		Short:                 "Stop clipboard manager",
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, _ []string) {
-			if _, err := daemon.StopAll(); err != nil {
+			if err := daemon.Stop(); err != nil {
 				log.Logger().Fatal(err)
 			}
 			if log.Verbose() {
 				log.Logger().Println("homie daemon stopped")
 			}
+		},
+	}
+
+	statusCmd = &cobra.Command{
+		Use:                   "status",
+		Short:                 "Show clipboard manager daemon status",
+		DisableFlagsInUseLine: true,
+		Run: func(cmd *cobra.Command, _ []string) {
+			running, pid, err := daemon.Status()
+			if err != nil {
+				log.Logger().Fatal(err)
+			}
+			if running {
+				fmt.Printf("running (pid %d)\n", pid)
+				return
+			}
+			fmt.Println("not running")
 		},
 	}
 )
@@ -142,4 +177,5 @@ func init() {
 	rootCmd.AddCommand(restartDaemonCmd)
 	rootCmd.AddCommand(runCmd)
 	rootCmd.AddCommand(stopCmd)
+	rootCmd.AddCommand(statusCmd)
 }

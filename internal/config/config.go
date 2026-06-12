@@ -5,24 +5,32 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/spf13/viper"
 )
 
+// Viper keys (and YAML keys in .homierc).
 const (
-	// Viper keys (and YAML keys in .homierc).
 	ViperKeyVerbose = "verbose"
 	ViperKeyLogFile = "log_file"
+	ViperKeyPIDFile = "pid_file"
 )
 
 const (
 	xdgConf       = "XDG_CONFIG_HOME"
+	xdgRuntime    = "XDG_RUNTIME_DIR"
+	runDir        = "/run/user"
 	appConfPath   = "$HOME/"
+	homeDirPrefix = "~/"
+
 	dbConfDirPerm = 0755
 	dbConfDirName = ".config"
 	dbSubdirName  = "homie"
 	dbFileName    = "homie.db"
+
+	pidFileName = "homie.pid"
 
 	confFileName = ".homierc"
 	confFileType = "yaml"
@@ -34,6 +42,7 @@ var ReadConfig = sync.OnceValue(readConfig)
 func readConfig() error {
 	viper.SetDefault(ViperKeyVerbose, false)
 	viper.SetDefault(ViperKeyLogFile, "")
+	viper.SetDefault(ViperKeyPIDFile, "")
 
 	viper.SetConfigName(confFileName)
 	viper.SetConfigType(confFileType)
@@ -76,4 +85,42 @@ func DBPath() (string, error) {
 		dbPath = filepath.Join(configDir, dbFileName)
 	})
 	return dbPath, pathErr
+}
+
+// PIDFilePath returns the path to the daemon pidfile.
+func PIDFilePath() (string, error) {
+	if err := ReadConfig(); err != nil {
+		return "", err
+	}
+	if p := ExpandHomePath(strings.TrimSpace(viper.GetString(ViperKeyPIDFile))); p != "" {
+		return p, nil
+	}
+
+	if xdg := os.Getenv(xdgRuntime); xdg != "" {
+		return filepath.Join(xdg, pidFileName), nil
+	}
+	return filepath.Join(runDir, fmt.Sprintf("%d", os.Getuid()), pidFileName), nil
+}
+
+// PreparePIDFile returns the pidfile path and ensures its parent directory exists.
+func PreparePIDFile() (string, error) {
+	path, err := PIDFilePath()
+	if err != nil {
+		return "", err
+	}
+	if err = os.MkdirAll(filepath.Dir(path), dbConfDirPerm); err != nil {
+		return "", fmt.Errorf("failed to create pidfile directory: %w", err)
+	}
+	return path, nil
+}
+
+func ExpandHomePath(p string) string {
+	if p == "" || !strings.HasPrefix(p, homeDirPrefix) {
+		return p
+	}
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return p
+	}
+	return filepath.Join(homeDir, strings.TrimPrefix(p, homeDirPrefix))
 }

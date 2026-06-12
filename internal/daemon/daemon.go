@@ -1,95 +1,134 @@
 package daemon
 
 import (
+	"errors"
 	"fmt"
 	"os"
+	"strconv"
+	"strings"
+	"syscall"
 
-	"github.com/shirou/gopsutil/process"
+	"github.com/kaliv0/homie/internal/config"
+	"github.com/kaliv0/homie/internal/log"
 )
 
-// Process represents a system process.
-type Process interface {
-	GetName() (string, error)
-	GetPid() int32
-	GetCliArgs() ([]string, error)
-	Terminate() error
+const (
+	pidFileFlags = os.O_CREATE | os.O_RDWR
+	pidFilePerm  = 0o600
+)
+
+// ErrAlreadyRunning is returned when another daemon holds the pidfile lock.
+var ErrAlreadyRunning = errors.New("daemon already running")
+
+// Lock holds the pidfile open with an exclusive flock for the daemon lifetime.
+type Lock struct {
+	file *os.File
+	path string
 }
 
-// ProcessLister enumerates running processes.
-type ProcessLister interface {
-	Processes() ([]Process, error)
-	CurrentPid() int32
-}
-
-// osProcess wraps a gopsutil process to satisfy the Process interface.
-type osProcess struct {
-	p *process.Process
-}
-
-func (o osProcess) GetName() (string, error)      { return o.p.Name() }
-func (o osProcess) GetPid() int32                 { return o.p.Pid }
-func (o osProcess) GetCliArgs() ([]string, error) { return o.p.CmdlineSlice() }
-func (o osProcess) Terminate() error              { return o.p.Terminate() }
-
-// osProcessLister uses gopsutil to enumerate system processes.
-type osProcessLister struct{}
-
-func (o osProcessLister) Processes() ([]Process, error) {
-	procs, err := process.Processes()
+// Acquire opens the pidfile, takes an exclusive lock, and writes the current PID.
+func Acquire() (*Lock, error) {
+	// find path and open file
+	path, err := config.PreparePIDFile()
 	if err != nil {
 		return nil, err
 	}
-	result := make([]Process, len(procs))
-	for i, p := range procs {
-		result[i] = osProcess{p: p}
-	}
-	return result, nil
-}
 
-func (o osProcessLister) CurrentPid() int32 {
-	return int32(os.Getpid())
-}
-
-// CheckAll returns true when no other homie "run" process exists (self excluded).
-func CheckAll() (bool, error) {
-	return ProcessDaemons(osProcessLister{}, false)
-}
-
-// StopAll terminates other homie "run" processes only.
-func StopAll() (bool, error) {
-	return ProcessDaemons(osProcessLister{}, true)
-}
-
-// ProcessDaemons finds homie processes with argv[1]=="run", excluding pl.CurrentPid().
-// If stop is false, returns false when any match exists; if true, terminates matches.
-func ProcessDaemons(pl ProcessLister, stop bool) (bool, error) {
-	processes, err := pl.Processes()
+	f, err := os.OpenFile(path, pidFileFlags, pidFilePerm)
 	if err != nil {
-		return false, fmt.Errorf("failed to enumerate processes: %w", err)
+		return nil, err
 	}
 
-	currentPid := pl.CurrentPid()
-	for _, p := range processes {
-		pName, err := p.GetName()
-		if err != nil {
-			continue // Skip inaccessible processes
+	// acquire lock
+	if err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		closeErr := f.Close()
+		if errors.Is(err, syscall.EWOULDBLOCK) {
+			return nil, ErrAlreadyRunning
 		}
+		return nil, errors.Join(err, closeErr)
+	}
+	// clear file (if stale there will old invalid pid)
+	if err = f.Truncate(0); err != nil {
+		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+		closeErr := f.Close()
+		return nil, errors.Join(err, closeErr)
+	}
+	// write current pid
+	if _, err = fmt.Fprintf(f, "%d\n", os.Getpid()); err != nil {
+		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+		closeErr := f.Close()
+		return nil, errors.Join(err, closeErr)
+	}
 
-		if pName == "homie" {
-			args, err := p.GetCliArgs()
+	return &Lock{file: f, path: path}, nil
+}
+
+// Release unlocks the pidfile, closes it, and removes it.
+func (l *Lock) Release() error {
+	_ = syscall.Flock(int(l.file.Fd()), syscall.LOCK_UN)
+	return errors.Join(l.file.Close(), os.Remove(l.path))
+}
+
+// Status reports whether a daemon holds the pidfile lock.
+func Status() (bool, int, error) {
+	// find path to pidfile
+	path, err := config.PIDFilePath()
+	if err != nil {
+		return false, 0, err
+	}
+	// open file
+	f, err := os.Open(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, 0, nil
+		}
+		return false, 0, err
+	}
+	defer func() {
+		if closeErr := f.Close(); closeErr != nil {
+			log.Logger().Println(closeErr)
+		}
+	}()
+
+	// try to acquire lock
+	if err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		if errors.Is(err, syscall.EWOULDBLOCK) {
+			// file already locked -> another instance is running
+			pid, err := readPID(path)
 			if err != nil {
-				continue
+				return false, 0, err
 			}
-			if len(args) > 1 && args[1] == "run" && currentPid != p.GetPid() {
-				if !stop {
-					return false, nil
-				}
-				if err = p.Terminate(); err != nil {
-					return false, fmt.Errorf("failed to terminate homie process (pid=%d): %v", p.GetPid(), err)
-				}
-			}
+			// return pid of running instance
+			return true, pid, nil
 		}
+		return false, 0, err
 	}
 
-	return true, nil
+	// if we were able to acquire lock to existing file -> it is stale,
+	// leftover from a previous instance no longer holding the lock
+	_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+	return false, 0, nil
+}
+
+// Stop sends SIGTERM to the daemon PID from the pidfile.
+func Stop() error {
+	// check if running
+	running, pid, err := Status()
+	if err != nil || !running {
+		return err
+	}
+	// find running process & terminate it
+	proc, err := os.FindProcess(pid)
+	if err != nil {
+		return err
+	}
+	return proc.Signal(syscall.SIGTERM)
+}
+
+func readPID(path string) (int, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return 0, err
+	}
+	return strconv.Atoi(strings.TrimSpace(string(data)))
 }

@@ -8,7 +8,7 @@ homie restart
 
 ### Behavior
 
-1. Terminate every other process that matches the daemon rule (executable `homie`, `run` as the second argv token).
+1. Send SIGTERM to the daemon PID from the pidfile.
 2. Spawn a new daemon in the background.
 
 If no daemon was running, the stop step is a no-op and a new daemon is still started.
@@ -24,3 +24,4 @@ If no daemon was running, the stop step is a no-op and a new daemon is still sta
 * [homie](homie.md)	 - Terminal-based clipboard manager
 * [homie start](homie_start.md)	 - Start clipboard manager
 * [homie stop](homie_stop.md)	 - Stop clipboard manager
+* [homie status](homie_status.md)	 - Show daemon status

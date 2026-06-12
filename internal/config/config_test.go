@@ -172,6 +172,49 @@ func TestReadConfig_WithValidFile(t *testing.T) {
 	}
 }
 
+func TestPIDFilePath_ConfigOverride(t *testing.T) {
+	useLiveReadConfig(t)
+
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+	path := filepath.Join(tmpDir, "state", "homie.pid")
+	configContent := []byte("pid_file: " + path + "\n")
+	if err := os.WriteFile(filepath.Join(tmpDir, confFileName), configContent, 0644); err != nil {
+		t.Fatalf("failed to write config file: %v", err)
+	}
+
+	got, err := PIDFilePath()
+	if err != nil {
+		t.Fatalf("PIDFilePath() failed: %v", err)
+	}
+	if got != path {
+		t.Errorf("expected path=%q, got %q", path, got)
+	}
+}
+
+func TestPreparePIDFileForWrite_CreatesParentDir(t *testing.T) {
+	useLiveReadConfig(t)
+
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+	path := filepath.Join(tmpDir, "nested", "homie.pid")
+	configContent := []byte("pid_file: " + path + "\n")
+	if err := os.WriteFile(filepath.Join(tmpDir, confFileName), configContent, 0644); err != nil {
+		t.Fatalf("failed to write config file: %v", err)
+	}
+
+	got, err := PreparePIDFile()
+	if err != nil {
+		t.Fatalf("PreparePIDFileForWrite() failed: %v", err)
+	}
+	if got != path {
+		t.Errorf("expected path=%q, got %q", path, got)
+	}
+	if _, err := os.Stat(filepath.Dir(path)); err != nil {
+		t.Fatalf("expected parent directory to be created: %v", err)
+	}
+}
+
 func TestReadConfig_WithInvalidYAML(t *testing.T) {
 	useLiveReadConfig(t)
 

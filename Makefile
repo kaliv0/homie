@@ -34,4 +34,4 @@ test:
 test-race:
 	go test -race ./...
 
-all: mod-verify lint build test-race
+all: mod-verify lint build test

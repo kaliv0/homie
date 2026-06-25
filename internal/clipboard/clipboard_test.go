@@ -1,10 +1,13 @@
 package clipboard
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"testing"
 	"time"
+
+	gclip "golang.design/x/clipboard"
 )
 
 type mockWriter struct {
@@ -27,7 +30,7 @@ type conditionalMockWriter struct {
 	callCount  int
 }
 
-func (m *conditionalMockWriter) Write(item []byte) error {
+func (m *conditionalMockWriter) Write(_ []byte) error {
 	m.callCount++
 	if m.callCount == m.failOnCall {
 		return m.err
@@ -36,9 +39,9 @@ func (m *conditionalMockWriter) Write(item []byte) error {
 }
 
 // trackClosed sends items to a buffered channel, closes it, and runs TrackClipboard.
-func trackClosed(t *testing.T, writer Writer, items ...[]byte) error {
+func trackClosed(t *testing.T, writer Writer, items ...gclip.Data) error {
 	t.Helper()
-	ch := make(chan []byte, len(items))
+	ch := make(chan gclip.Data, len(items))
 	for _, item := range items {
 		ch <- item
 	}
@@ -64,7 +67,11 @@ func TestTrackClipboard_ReceivesItems(t *testing.T) {
 	t.Parallel()
 
 	writer := &mockWriter{}
-	err := trackClosed(t, writer, []byte("item1"), []byte("item2"), []byte("item3"))
+	err := trackClosed(t, writer,
+		gclip.Data{Format: gclip.FmtText, Bytes: []byte("item1")},
+		gclip.Data{Format: gclip.FmtText, Bytes: []byte("item2")},
+		gclip.Data{Format: gclip.FmtText, Bytes: []byte("item3")},
+	)
 	if err != nil {
 		t.Fatalf("TrackClipboard() failed: %v", err)
 	}
@@ -84,7 +91,7 @@ func TestTrackClipboard_ContextCancellation(t *testing.T) {
 	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 
-	ch := make(chan []byte)
+	ch := make(chan gclip.Data)
 	writer := &mockWriter{}
 
 	done := make(chan error, 1)
@@ -99,7 +106,7 @@ func TestTrackClipboard_ContextCancellation(t *testing.T) {
 
 func TestTrackClipboard_ChannelClose(t *testing.T) {
 	t.Parallel()
-	ch := make(chan []byte)
+	ch := make(chan gclip.Data)
 	writer := &mockWriter{}
 
 	done := make(chan error, 1)
@@ -117,7 +124,7 @@ func TestTrackClipboard_WriteError(t *testing.T) {
 	writeErr := errors.New("write failed")
 	writer := &mockWriter{err: writeErr}
 
-	err := trackClosed(t, writer, []byte("data"))
+	err := trackClosed(t, writer, gclip.Data{Format: gclip.FmtText, Bytes: []byte("data")})
 	if !errors.Is(err, writeErr) {
 		t.Fatalf("expected write error, got %v", err)
 	}
@@ -127,12 +134,12 @@ func TestTrackClipboard_ItemVariants(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name    string
-		item    []byte
+		item    gclip.Data
 		wantLen int
 	}{
-		{"empty item", []byte(""), 0},
-		{"nil item", nil, 0},
-		{"large item", make([]byte, 100000), 100000},
+		{"empty item", gclip.Data{Format: gclip.FmtText, Bytes: []byte("")}, 0},
+		{"nil item", gclip.Data{Format: gclip.FmtText, Bytes: nil}, 0},
+		{"large item", gclip.Data{Format: gclip.FmtText, Bytes: bytes.Repeat([]byte{'A'}, 100000)}, 100000},
 	}
 
 	for _, tt := range tests {
@@ -154,9 +161,9 @@ func TestTrackClipboard_ItemVariants(t *testing.T) {
 func TestTrackClipboard_ManyItems(t *testing.T) {
 	t.Parallel()
 	writer := &mockWriter{}
-	items := make([][]byte, 100)
+	items := make([]gclip.Data, 100)
 	for i := range items {
-		items[i] = []byte("item")
+		items[i] = gclip.Data{Format: gclip.FmtText, Bytes: []byte("item")}
 	}
 
 	if err := trackClosed(t, writer, items...); err != nil {
@@ -172,7 +179,10 @@ func TestTrackClipboard_WriteErrorOnSecondItem(t *testing.T) {
 	writeErr := errors.New("second write failed")
 	writer := &conditionalMockWriter{failOnCall: 2, err: writeErr}
 
-	err := trackClosed(t, writer, []byte("first"), []byte("second"))
+	err := trackClosed(t, writer,
+		gclip.Data{Format: gclip.FmtText, Bytes: []byte("first")},
+		gclip.Data{Format: gclip.FmtText, Bytes: []byte("second")},
+	)
 	if !errors.Is(err, writeErr) {
 		t.Fatalf("expected write error on second item, got %v", err)
 	}
@@ -185,7 +195,7 @@ func TestTrackClipboard_ContextCancelDuringItems(t *testing.T) {
 	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 
-	ch := make(chan []byte)
+	ch := make(chan gclip.Data)
 	writer := &mockWriter{}
 
 	done := make(chan error, 1)
@@ -193,7 +203,7 @@ func TestTrackClipboard_ContextCancelDuringItems(t *testing.T) {
 		done <- TrackClipboard(ctx, writer, ch)
 	}()
 
-	ch <- []byte("before-cancel")
+	ch <- gclip.Data{Format: gclip.FmtText, Bytes: []byte("before-cancel")}
 	cancel()
 
 	assertTrackClipboardDone(t, done, "TrackClipboard did not exit after cancel")

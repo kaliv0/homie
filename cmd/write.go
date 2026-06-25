@@ -12,6 +12,7 @@ import (
 	"github.com/kaliv0/homie/internal/storage"
 )
 
+// used as a workaround to enable copying inside tmux session
 var writeCmd = &cobra.Command{
 	Use:    "write",
 	Hidden: true,

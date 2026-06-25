@@ -48,8 +48,7 @@ func readConfig() error {
 	viper.SetConfigType(confFileType)
 	viper.AddConfigPath(appConfPath)
 	if err := viper.ReadInConfig(); err != nil {
-		var configFileNotFoundError viper.ConfigFileNotFoundError
-		if !errors.As(err, &configFileNotFoundError) {
+		if _, ok := errors.AsType[viper.ConfigFileNotFoundError](err); !ok {
 			return fmt.Errorf("failed to read config file %s from %s: %w", confFileName, appConfPath, err)
 		}
 	}

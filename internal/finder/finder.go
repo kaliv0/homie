@@ -81,9 +81,7 @@ func handleLoadChannel(ctx context.Context, history *[]storage.ClipboardItem, db
 	offset, limit, total int, wg *sync.WaitGroup) chan struct{} {
 	// signal more items needed -> triggered from fuzzyfinder.WithPreviewWindow
 	loadMore := make(chan struct{}, 1)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		loadedOffset := offset
 		for {
 			select {
@@ -99,7 +97,7 @@ func handleLoadChannel(ctx context.Context, history *[]storage.ClipboardItem, db
 				page, err := db.Read(loadedOffset, limit)
 				if err != nil {
 					log.Logger().Printf("failed to load more history items (offset=%d, limit=%d, total=%d): %v\n",
-							loadedOffset, limit, total, err)
+						loadedOffset, limit, total, err)
 					continue
 				}
 				if len(page) > 0 {
@@ -111,7 +109,7 @@ func handleLoadChannel(ctx context.Context, history *[]storage.ClipboardItem, db
 				return
 			}
 		}
-	}()
+	})
 	return loadMore
 }
 

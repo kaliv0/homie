@@ -93,20 +93,24 @@ func fetchDisplayHistory() (string, error) {
 }
 
 func writeToClipboard(text string) error {
-	if tool := clipboardTool(); tool != "" {
+	tool, err := clipboardTool()
+	if err != nil {
+		return err
+	}
+	if tool != "" {
 		return clipboard.Write(text, tool)
 	}
 
-	if err := gclip.Init(); err != nil {
+	if err = gclip.Init(); err != nil {
 		return fmt.Errorf("failed to initialize clipboard: %w", err)
 	}
 	gclip.Write(gclip.FmtText, []byte(text))
 	return nil
 }
 
-func clipboardTool() string {
+func clipboardTool() (string, error) {
 	if runtime.GOOS != "linux" {
-		return ""
+		return "", nil
 	}
 	for tool, cmd := range map[string]string{
 		"xclip":        "xclip",
@@ -115,12 +119,12 @@ func clipboardTool() string {
 	} {
 		if viper.GetBool("use_" + tool) {
 			if _, err := exec.LookPath(cmd); err != nil {
-				log.Logger().Printf("%s not found: %v\n", tool, err)
+				return "", fmt.Errorf("%s not found: %w", tool, err)
 			}
-			return tool
+			return tool, nil
 		}
 	}
-	return ""
+	return "", fmt.Errorf("command-line tool not selected, choose between: xclip, xsel or wl-clipboard")
 }
 
 func pasteText(text string) error {

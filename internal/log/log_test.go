@@ -24,18 +24,18 @@ func testCmdWithLogFlags() *cobra.Command {
 // resetLogAfterTest restores the default logger after the test (verbose off, no log file).
 func resetLogAfterTest(t *testing.T) {
 	t.Helper()
-	t.Cleanup(func() { Configure(false, "") })
+	t.Cleanup(func() { configure(false, "") })
 }
 
 func TestConfigureVerbose(t *testing.T) {
 	resetLogAfterTest(t)
 
-	Configure(true, "")
+	configure(true, "")
 	if !Verbose() {
 		t.Fatal("Verbose() = false, want true")
 	}
 
-	Configure(false, "")
+	configure(false, "")
 	if Verbose() {
 		t.Fatal("Verbose() = true, want false")
 	}
@@ -43,7 +43,7 @@ func TestConfigureVerbose(t *testing.T) {
 
 func TestLoggerNonNil(t *testing.T) {
 	resetLogAfterTest(t)
-	Configure(false, "")
+	configure(false, "")
 	if Logger() == nil {
 		t.Fatal("Logger() == nil")
 	}
@@ -53,7 +53,7 @@ func TestConfigureLogFile(t *testing.T) {
 	resetLogAfterTest(t)
 
 	path := filepath.Join(t.TempDir(), "homie.log")
-	Configure(false, path)
+	configure(false, path)
 	Logger().Printf("info-line\n")
 
 	data, err := os.ReadFile(path)
@@ -80,9 +80,9 @@ func TestConfigureSameLogPathReused(t *testing.T) {
 	resetLogAfterTest(t)
 
 	path := filepath.Join(t.TempDir(), "homie.log")
-	Configure(false, path)
+	configure(false, path)
 	Logger().Printf("first\n")
-	Configure(true, path)
+	configure(true, path)
 	Logger().Printf("second\n")
 
 	data, err := os.ReadFile(path)
@@ -95,19 +95,19 @@ func TestConfigureSameLogPathReused(t *testing.T) {
 	}
 }
 
-func TestConfigureFromFlags_UsesConfigWhenFlagNotSet(t *testing.T) {
+func TestConfigure_UsesConfigWhenFlagNotSet(t *testing.T) {
 	resetLogAfterTest(t)
 	viper.Set(config.ViperKeyVerbose, true)
 	viper.Set(config.ViperKeyLogFile, "")
 
 	cmd := testCmdWithLogFlags()
-	ConfigureFromFlags(cmd.Flags())
+	Configure(cmd.Flags())
 	if !Verbose() {
 		t.Fatal("Verbose() = false, want true")
 	}
 }
 
-func TestConfigureFromFlags_FlagOverridesConfig(t *testing.T) {
+func TestConfigure_FlagOverridesConfig(t *testing.T) {
 	resetLogAfterTest(t)
 	viper.Set(config.ViperKeyVerbose, false)
 	viper.Set(config.ViperKeyLogFile, "")
@@ -117,19 +117,19 @@ func TestConfigureFromFlags_FlagOverridesConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ConfigureFromFlags(cmd.Flags())
+	Configure(cmd.Flags())
 	if !Verbose() {
 		t.Fatal("Verbose() = false, want true")
 	}
 }
 
-func TestConfigureFromFlags_ExpandsHomeInConfigLogFile(t *testing.T) {
+func TestConfigure_ExpandsHomeInConfigLogFile(t *testing.T) {
 	resetLogAfterTest(t)
 	viper.Set(config.ViperKeyVerbose, true)
 	viper.Set(config.ViperKeyLogFile, "~/homie-configure-from-command.log")
 
 	cmd := testCmdWithLogFlags()
-	ConfigureFromFlags(cmd.Flags())
+	Configure(cmd.Flags())
 	Logger().Printf("hello\n")
 
 	homeDir, err := os.UserHomeDir()
@@ -151,14 +151,14 @@ func TestConfigureFromFlags_ExpandsHomeInConfigLogFile(t *testing.T) {
 	}
 }
 
-func TestConfigureFromFlags_ConfigVerboseAndLogFile_Tees(t *testing.T) {
+func TestConfigure_ConfigVerboseAndLogFile_Tees(t *testing.T) {
 	resetLogAfterTest(t)
 	viper.Set(config.ViperKeyVerbose, true)
 	path := filepath.Join(t.TempDir(), "homie.log")
 	viper.Set(config.ViperKeyLogFile, path)
 
 	cmd := testCmdWithLogFlags()
-	ConfigureFromFlags(cmd.Flags())
+	Configure(cmd.Flags())
 	Logger().Printf("only-file\n")
 
 	data, err := os.ReadFile(path)
@@ -170,7 +170,7 @@ func TestConfigureFromFlags_ConfigVerboseAndLogFile_Tees(t *testing.T) {
 	}
 }
 
-func TestConfigureFromFlags_TeeWhenBothFlagsExplicit(t *testing.T) {
+func TestConfigure_TeeWhenBothFlagsExplicit(t *testing.T) {
 	resetLogAfterTest(t)
 	viper.Set(config.ViperKeyVerbose, false)
 	path := filepath.Join(t.TempDir(), "homie.log")
@@ -181,7 +181,7 @@ func TestConfigureFromFlags_TeeWhenBothFlagsExplicit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ConfigureFromFlags(cmd.Flags())
+	Configure(cmd.Flags())
 	Logger().Printf("tee-line\n")
 
 	data, err := os.ReadFile(path)

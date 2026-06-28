@@ -35,11 +35,12 @@ var (
 )
 
 func init() {
-	Configure(false, "")
+	// NB: in case we call logger without going through cobra's root command - currently only used in test cases
+	configure(false, "")
 }
 
-// ConfigureFromFlags applies verbose and log-file from flags and .homierc (explicit flags override config).
-func ConfigureFromFlags(pflags *pflag.FlagSet) {
+// Configure applies verbose and log-file from flags and .homierc (explicit flags override config).
+func Configure(pflags *pflag.FlagSet) {
 	var verboseEnabled bool
 	if pflags.Changed(verboseConfig) {
 		verboseEnabled, _ = pflags.GetBool(verboseConfig)
@@ -54,11 +55,10 @@ func ConfigureFromFlags(pflags *pflag.FlagSet) {
 		filePath = viper.GetString(config.ViperKeyLogFile)
 	}
 	expandedPath := config.ExpandHomePath(strings.TrimSpace(filePath))
-	Configure(verboseEnabled, expandedPath)
+	configure(verboseEnabled, expandedPath)
 }
 
-// Configure sets verbose diagnostics, an optional append-only log file (0o600), and tee (stderr + file).
-func Configure(verboseEnabled bool, filePath string) {
+func configure(verboseEnabled bool, filePath string) {
 	mu.Lock()
 	defer mu.Unlock()
 	verbose = verboseEnabled

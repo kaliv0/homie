@@ -15,7 +15,7 @@ var rootCmd = &cobra.Command{
 		if err := config.ReadConfig(); err != nil {
 			return err
 		}
-		log.ConfigureFromFlags(cmd.Flags())
+		log.Configure(cmd.Flags())
 		return nil
 	},
 	Long: `

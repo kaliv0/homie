@@ -1,7 +1,6 @@
 package finder
 
 import (
-	"context"
 	"errors"
 	"sync"
 	"testing"
@@ -98,7 +97,7 @@ func readsToWait(tc limitsCase) int {
 
 // loadChannelFixture is shared test state.
 type loadChannelFixture struct {
-	history  []storage.ClipboardItem
+	session  *session
 	wg       sync.WaitGroup
 	loadMore chan struct{}
 }
@@ -107,12 +106,11 @@ type loadChannelFixture struct {
 func newLoadChannelFixture(t *testing.T, reader HistoryReader, initHistory []storage.ClipboardItem,
 	offset, limit, total int) *loadChannelFixture {
 	t.Helper()
-	ctx := t.Context()
 
 	f := &loadChannelFixture{
-		history: append([]storage.ClipboardItem{}, initHistory...),
+		session: &session{history: append([]storage.ClipboardItem{}, initHistory...)},
 	}
-	f.loadMore = handleLoadChannel(ctx, &f.history, reader, offset, limit, total, &f.wg)
+	f.loadMore = handleLoadChannel(f.session, reader, offset, limit, total, &f.wg)
 
 	t.Cleanup(func() {
 		close(f.loadMore)
@@ -123,9 +121,9 @@ func newLoadChannelFixture(t *testing.T, reader HistoryReader, initHistory []sto
 
 // historyLen returns the current history length.
 func (f *loadChannelFixture) historyLen() int {
-	mu.RLock()
-	defer mu.RUnlock()
-	return len(f.history)
+	f.session.mu.RLock()
+	defer f.session.mu.RUnlock()
+	return len(f.session.history)
 }
 
 func TestHandleLoadChannel_LoadsPages(t *testing.T) {
@@ -158,19 +156,6 @@ func TestHandleLoadChannel_StopsAtTotal(t *testing.T) {
 	}
 }
 
-func TestHandleLoadChannel_ContextCancel(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	reader := newMockReader(nil, nil, 100)
-	var history []storage.ClipboardItem
-	var wg sync.WaitGroup
-	loadMore := handleLoadChannel(ctx, &history, reader, 0, 5, 100, &wg)
-
-	cancel()
-
-	wg.Wait()
-	close(loadMore)
-}
-
 func TestHandleLoadChannel_ReadError(t *testing.T) {
 	reader := newMockReader(nil, errors.New("db error"), 100)
 	f := newLoadChannelFixture(t, reader, nil, 0, 5, 100)
@@ -185,9 +170,9 @@ func TestHandleLoadChannel_ReadError(t *testing.T) {
 
 func TestHandleLoadChannel_ChannelClose(t *testing.T) {
 	reader := newMockReader(nil, nil, 100)
-	var history []storage.ClipboardItem
+	s := &session{}
 	var wg sync.WaitGroup
-	loadMore := handleLoadChannel(t.Context(), &history, reader, 0, 5, 100, &wg)
+	loadMore := handleLoadChannel(s, reader, 0, 5, 100, &wg)
 
 	close(loadMore)
 	wg.Wait()

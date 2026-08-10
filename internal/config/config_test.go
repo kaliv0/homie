@@ -28,7 +28,6 @@ func mustDBPath(t *testing.T) string {
 }
 
 // useLiveReadConfig makes each ReadConfig() call invoke readConfig directly (bypassing sync.Once)
-// so tests can reload config; restored after the test.
 func useLiveReadConfig(t *testing.T) {
 	t.Helper()
 	ReadConfig = func() error { return readConfig() }

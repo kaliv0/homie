@@ -1,7 +1,6 @@
 package finder
 
 import (
-	"context"
 	"errors"
 	"strings"
 	"sync"
@@ -21,7 +20,10 @@ type HistoryReader interface {
 
 const prompt = "D'OH >> "
 
-var mu sync.RWMutex
+type session struct {
+	mu      sync.RWMutex
+	history []storage.ClipboardItem
+}
 
 // ListHistory loads clipboard history and presents a fuzzy finder.
 func ListHistory(dbPath string, limit int) (string, error) {
@@ -48,77 +50,74 @@ func ListHistory(dbPath string, limit int) (string, error) {
 		return "", err
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	s := &session{history: history}
 
-	// Wait for the pagination goroutine to finish before db.Close() runs,
-	// so an in-flight db.Read() isn't interrupted by a closed connection.
-	var wg sync.WaitGroup
-	loadMore := handleLoadChannel(ctx, &history, db, offset, limit, total, &wg)
-	defer func() {
-		close(loadMore)
-		wg.Wait()
-	}()
+	// stop the pagination goroutine before db.Close() so an in-flight db.Read()
+	// isn't interrupted by a closed connection.
+	var (
+		wg   sync.WaitGroup
+		once sync.Once
+	)
+	loadMore := handleLoadChannel(s, db, offset, limit, total, &wg)
+	stop := func() {
+		once.Do(func() {
+			close(loadMore)
+			wg.Wait()
+		})
+	}
+	defer stop()
 
-	idxs, err := findItemIdxs(&history, loadMore)
+	idxs, err := findItemIdxs(s, loadMore)
 	if err != nil {
 		return "", err
 	}
-
 	// return selected item (from preview window)
 	if len(idxs) == 0 {
 		return "", nil
 	}
+	stop()
 
 	out := make([]string, 0, len(idxs))
 	for _, i := range idxs {
-		out = append(out, history[i].ClipText)
+		out = append(out, s.history[i].ClipText)
 	}
 	return strings.Join(out, " "), nil
 }
 
-func handleLoadChannel(ctx context.Context, history *[]storage.ClipboardItem, db HistoryReader,
+func handleLoadChannel(s *session, db HistoryReader,
 	offset, limit, total int, wg *sync.WaitGroup) chan struct{} {
 	// signal more items needed -> triggered from fuzzyfinder.WithPreviewWindow
 	loadMore := make(chan struct{}, 1)
 	wg.Go(func() {
 		loadedOffset := offset
-		for {
-			select {
-			case _, ok := <-loadMore:
-				if !ok {
-					return
-				}
-				candidateOffset := loadedOffset + limit
-				if candidateOffset >= total {
-					continue
-				}
-				loadedOffset = candidateOffset
-				page, err := db.Read(loadedOffset, limit)
-				if err != nil {
-					log.Logger().Printf("failed to load more history items (offset=%d, limit=%d, total=%d): %v\n",
-						loadedOffset, limit, total, err)
-					continue
-				}
-				if len(page) > 0 {
-					mu.Lock()
-					*history = append(*history, page...)
-					mu.Unlock()
-				}
-			case <-ctx.Done():
-				return
+		for range loadMore {
+			candidateOffset := loadedOffset + limit
+			if candidateOffset >= total {
+				continue
+			}
+			loadedOffset = candidateOffset
+			page, err := db.Read(loadedOffset, limit)
+			if err != nil {
+				log.Logger().Printf("failed to load more history items (offset=%d, limit=%d, total=%d): %v\n",
+					loadedOffset, limit, total, err)
+				continue
+			}
+			if len(page) > 0 {
+				s.mu.Lock()
+				s.history = append(s.history, page...)
+				s.mu.Unlock()
 			}
 		}
 	})
 	return loadMore
 }
 
-func findItemIdxs(history *[]storage.ClipboardItem, loadMore chan struct{}) ([]int, error) {
+func findItemIdxs(s *session, loadMore chan struct{}) ([]int, error) {
 	idxs, err := fuzzyfinder.FindMulti(
-		history,
+		&s.history,
 		// itemFunc -> returns items in main history list
 		func(i int) string {
-			return (*history)[i].ClipText
+			return s.history[i].ClipText
 		},
 		// opts for fuzzy-finder window
 		fuzzyfinder.WithPreviewWindow(func(i, width, height int) string {
@@ -131,10 +130,10 @@ func findItemIdxs(history *[]storage.ClipboardItem, loadMore chan struct{}) ([]i
 				return ""
 			}
 			// return string to display in previewWindow
-			return (*history)[i].ClipText
+			return s.history[i].ClipText
 		}),
 		// reloads passed history slice automatically when items appended
-		fuzzyfinder.WithHotReloadLock(mu.RLocker()),
+		fuzzyfinder.WithHotReloadLock(s.mu.RLocker()),
 		fuzzyfinder.WithPromptString(prompt),
 	)
 	if err != nil && !errors.Is(err, fuzzyfinder.ErrAbort) {

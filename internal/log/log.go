@@ -58,6 +58,7 @@ func ConfigureFromFlags(pflags *pflag.FlagSet) {
 }
 
 // Configure sets verbose diagnostics, an optional append-only log file (0o600), and tee (stderr + file).
+// Called only at process start.
 func Configure(verboseEnabled bool, filePath string) {
 	mu.Lock()
 	defer mu.Unlock()

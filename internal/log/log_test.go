@@ -1,6 +1,7 @@
 package log
 
 import (
+	stdlog "log"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -21,14 +22,26 @@ func testCmdWithLogFlags() *cobra.Command {
 	return cmd
 }
 
-// resetLogAfterTest restores the default logger after the test (verbose off, no log file).
-func resetLogAfterTest(t *testing.T) {
+// resetLog restores default package logger state.
+func resetLog(t *testing.T) {
 	t.Helper()
-	t.Cleanup(func() { Configure(false, "") })
+	t.Cleanup(restoreDefaultLogger)
+}
+
+func restoreDefaultLogger() {
+	mu.Lock()
+	defer mu.Unlock()
+	if logFile != nil {
+		_ = logFile.Close()
+		logFile = nil
+		logPath = ""
+	}
+	verbose = false
+	std = stdlog.New(os.Stderr, logPrefix, stdlog.Llongfile)
 }
 
 func TestConfigureVerbose(t *testing.T) {
-	resetLogAfterTest(t)
+	resetLog(t)
 
 	Configure(true, "")
 	if !Verbose() {
@@ -42,7 +55,7 @@ func TestConfigureVerbose(t *testing.T) {
 }
 
 func TestLoggerNonNil(t *testing.T) {
-	resetLogAfterTest(t)
+	resetLog(t)
 	Configure(false, "")
 	if Logger() == nil {
 		t.Fatal("Logger() == nil")
@@ -50,7 +63,7 @@ func TestLoggerNonNil(t *testing.T) {
 }
 
 func TestConfigureLogFile(t *testing.T) {
-	resetLogAfterTest(t)
+	resetLog(t)
 
 	path := filepath.Join(t.TempDir(), "homie.log")
 	Configure(false, path)
@@ -77,7 +90,7 @@ func TestConfigureLogFile(t *testing.T) {
 }
 
 func TestConfigureSameLogPathReused(t *testing.T) {
-	resetLogAfterTest(t)
+	resetLog(t)
 
 	path := filepath.Join(t.TempDir(), "homie.log")
 	Configure(false, path)
@@ -96,7 +109,7 @@ func TestConfigureSameLogPathReused(t *testing.T) {
 }
 
 func TestConfigureFromFlags_UsesConfigWhenFlagNotSet(t *testing.T) {
-	resetLogAfterTest(t)
+	resetLog(t)
 	viper.Set(config.ViperKeyVerbose, true)
 	viper.Set(config.ViperKeyLogFile, "")
 
@@ -108,7 +121,7 @@ func TestConfigureFromFlags_UsesConfigWhenFlagNotSet(t *testing.T) {
 }
 
 func TestConfigureFromFlags_FlagOverridesConfig(t *testing.T) {
-	resetLogAfterTest(t)
+	resetLog(t)
 	viper.Set(config.ViperKeyVerbose, false)
 	viper.Set(config.ViperKeyLogFile, "")
 
@@ -124,7 +137,7 @@ func TestConfigureFromFlags_FlagOverridesConfig(t *testing.T) {
 }
 
 func TestConfigureFromFlags_ExpandsHomeInConfigLogFile(t *testing.T) {
-	resetLogAfterTest(t)
+	resetLog(t)
 	viper.Set(config.ViperKeyVerbose, true)
 	viper.Set(config.ViperKeyLogFile, "~/homie-configure-from-command.log")
 
@@ -152,7 +165,7 @@ func TestConfigureFromFlags_ExpandsHomeInConfigLogFile(t *testing.T) {
 }
 
 func TestConfigureFromFlags_ConfigVerboseAndLogFile_Tees(t *testing.T) {
-	resetLogAfterTest(t)
+	resetLog(t)
 	viper.Set(config.ViperKeyVerbose, true)
 	path := filepath.Join(t.TempDir(), "homie.log")
 	viper.Set(config.ViperKeyLogFile, path)
@@ -171,7 +184,7 @@ func TestConfigureFromFlags_ConfigVerboseAndLogFile_Tees(t *testing.T) {
 }
 
 func TestConfigureFromFlags_TeeWhenBothFlagsExplicit(t *testing.T) {
-	resetLogAfterTest(t)
+	resetLog(t)
 	viper.Set(config.ViperKeyVerbose, false)
 	path := filepath.Join(t.TempDir(), "homie.log")
 	viper.Set(config.ViperKeyLogFile, "")

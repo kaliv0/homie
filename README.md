@@ -3,8 +3,9 @@
 </p>
 
 <a href="https://github.com/kaliv0/homie/releases"><img src="https://img.shields.io/github/release/kaliv0/homie.svg" alt="Latest Release"></a>
-<a href="https://pkg.go.dev/github.com/kaliv0/homie"><img src="https://pkg.go.dev/badge/github.com/kaliv0/homie.svg"></a>
+<a href="https://pkg.go.dev/github.com/kaliv0/homie"><img src="https://pkg.go.dev/badge/github.com/kaliv0/homie.svg" alt="pkg.go.dev"></a>
 <a href="https://github.com/kaliv0/homie/actions"><img src="https://github.com/kaliv0/homie/actions/workflows/build.yml/badge.svg?branch=main" alt="Build Status"></a>
+<a href="https://www.linuxlinks.com/best-free-open-source-linux-tui-clipboard-managers/"><img src="https://img.shields.io/badge/LinuxLinks-blue" alt="LinuxLinks"></a>
 
 # Homie
 
@@ -19,6 +20,7 @@ Supports <i>fuzzy search</i>, <i>multi-select</i> and other adorable <i>chicaner
 ```shell
 go install github.com/kaliv0/homie@latest
 ```
+
 On `linux` you would also need `xclip`, `xsel` or `wl-clipboard` installed as an external dependency
 
 ---
@@ -96,6 +98,7 @@ After that it will scan the database and if there are records above certain limi
 ---
 
 <b>Key bindings</b>:
+
 - <i>Ctrl + h</i> (<i>prefix + h</i> if inside a tmux session) - opens clipboard history popup (copies selection to system clipboard)
 - <i>Ctrl + p</i> (<i>prefix + p</i>) - opens clipboard history popup and pastes selected item
 

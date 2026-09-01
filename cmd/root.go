@@ -2,20 +2,28 @@ package cmd
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
 	"github.com/kaliv0/homie/internal/config"
 	"github.com/kaliv0/homie/internal/log"
 )
 
+var cfg *config.Config
+
 var rootCmd = &cobra.Command{
 	Use:   "homie",
 	Short: "Terminal-based clipboard manager",
 	PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
-		// Single place for loading .homierc -> reused in children
 		if err := config.ReadConfig(); err != nil {
 			return err
 		}
-		log.ConfigureFromFlags(cmd.Flags())
+
+		var err error
+		cfg, err = config.Parse(viper.GetViper())
+		if err != nil {
+			return err
+		}
+		log.Configure(cfg.Verbose, cfg.LogFile)
 		return nil
 	},
 	Long: `
@@ -47,8 +55,11 @@ var rootCmd = &cobra.Command{
 `}
 
 func init() {
-	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "enable verbose diagnostic messages")
-	rootCmd.PersistentFlags().String("log-file", "", "append logs to file")
+	rootCmd.PersistentFlags().BoolP(config.KeyVerbose, "v", false, "enable verbose diagnostic messages")
+	rootCmd.PersistentFlags().String(config.FlagLogFile, "", "append logs to file")
+
+	config.BindFlag(config.KeyVerbose, rootCmd.PersistentFlags().Lookup(config.KeyVerbose))
+	config.BindFlag(config.KeyLogFile, rootCmd.PersistentFlags().Lookup(config.FlagLogFile))
 }
 
 // Execute runs the root cobra command.

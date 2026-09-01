@@ -7,11 +7,6 @@ import (
 	"os"
 	"strings"
 	"sync"
-
-	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
-
-	"github.com/kaliv0/homie/internal/config"
 )
 
 const (
@@ -19,11 +14,7 @@ const (
 	logFilePerm  = 0o600
 )
 
-const (
-	verboseConfig = "verbose"
-	fileConfig    = "log-file"
-	logPrefix     = "D'OH: "
-)
+const logPrefix = "D'OH: "
 
 var (
 	mu      sync.RWMutex
@@ -31,30 +22,11 @@ var (
 	verbose bool
 
 	logFile *os.File
-	logPath string // path of the open logFile; empty if none
+	logPath string // path of the open logFile, empty if none
 )
 
 func init() {
 	Configure(false, "")
-}
-
-// ConfigureFromFlags applies verbose and log-file from flags and .homierc (explicit flags override config).
-func ConfigureFromFlags(pflags *pflag.FlagSet) {
-	var verboseEnabled bool
-	if pflags.Changed(verboseConfig) {
-		verboseEnabled, _ = pflags.GetBool(verboseConfig)
-	} else {
-		verboseEnabled = viper.GetBool(config.ViperKeyVerbose)
-	}
-
-	var filePath string
-	if pflags.Changed(fileConfig) {
-		filePath, _ = pflags.GetString(fileConfig)
-	} else {
-		filePath = viper.GetString(config.ViperKeyLogFile)
-	}
-	expandedPath := config.ExpandHomePath(strings.TrimSpace(filePath))
-	Configure(verboseEnabled, expandedPath)
 }
 
 // Configure sets verbose diagnostics, an optional append-only log file (0o600), and tee (stderr + file).

@@ -1,6 +1,7 @@
 package log
 
 import (
+	"bytes"
 	stdlog "log"
 	"os"
 	"path/filepath"
@@ -9,17 +10,54 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
 	"github.com/kaliv0/homie/internal/config"
 )
 
+func viperFromYAML(t *testing.T, yaml string) *viper.Viper {
+	t.Helper()
+	v := viper.New()
+	if yaml == "" {
+		return v
+	}
+	v.SetConfigType("yaml")
+	if err := v.ReadConfig(bytes.NewBufferString(yaml)); err != nil {
+		t.Fatalf("ReadConfig: %v", err)
+	}
+	return v
+}
+
+func mergeRootFlags(v *viper.Viper, flags *pflag.FlagSet) {
+	if flags.Changed(config.KeyVerbose) {
+		verbose, _ := flags.GetBool(config.KeyVerbose)
+		v.Set(config.KeyVerbose, verbose)
+	}
+	if flags.Changed(config.FlagLogFile) {
+		logFile, _ := flags.GetString(config.FlagLogFile)
+		v.Set(config.KeyLogFile, logFile)
+	}
+}
+
 // testCmdWithLogFlags returns a cobra command with the same logging flags as the homie CLI.
 func testCmdWithLogFlags() *cobra.Command {
 	cmd := &cobra.Command{Use: "test"}
-	cmd.Flags().BoolP("verbose", "v", false, "verbosity")
-	cmd.Flags().String("log-file", "", "log file")
+	cmd.Flags().BoolP(config.KeyVerbose, "v", false, "verbosity")
+	cmd.Flags().String(config.FlagLogFile, "", "log file")
 	return cmd
+}
+
+// configureLikeRoot mirrors cmd/root.go PersistentPreRunE logging setup.
+func configureLikeRoot(t *testing.T, cmd *cobra.Command, yaml string) {
+	t.Helper()
+	v := viperFromYAML(t, yaml)
+	mergeRootFlags(v, cmd.Flags())
+	cfg, err := config.Parse(v)
+	if err != nil {
+		t.Fatalf("Parse() failed: %v", err)
+	}
+	Configure(cfg.Verbose, cfg.LogFile)
 }
 
 // resetLog restores default package logger state.
@@ -44,21 +82,13 @@ func TestConfigureVerbose(t *testing.T) {
 	resetLog(t)
 
 	Configure(true, "")
-	if !Verbose() {
-		t.Fatal("Verbose() = false, want true")
+	if !Verbose() || Logger() == nil {
+		t.Fatal("expected verbose logger")
 	}
 
 	Configure(false, "")
-	if Verbose() {
-		t.Fatal("Verbose() = true, want false")
-	}
-}
-
-func TestLoggerNonNil(t *testing.T) {
-	resetLog(t)
-	Configure(false, "")
-	if Logger() == nil {
-		t.Fatal("Logger() == nil")
+	if Verbose() || Logger() == nil {
+		t.Fatal("expected non-verbose logger")
 	}
 }
 
@@ -108,50 +138,40 @@ func TestConfigureSameLogPathReused(t *testing.T) {
 	}
 }
 
-func TestConfigureFromFlags_UsesConfigWhenFlagNotSet(t *testing.T) {
+func TestConfigureLikeRoot_UsesConfigWhenFlagNotSet(t *testing.T) {
 	resetLog(t)
-	viper.Set(config.ViperKeyVerbose, true)
-	viper.Set(config.ViperKeyLogFile, "")
 
 	cmd := testCmdWithLogFlags()
-	ConfigureFromFlags(cmd.Flags())
+	configureLikeRoot(t, cmd, "verbose: true\n")
 	if !Verbose() {
 		t.Fatal("Verbose() = false, want true")
 	}
 }
 
-func TestConfigureFromFlags_FlagOverridesConfig(t *testing.T) {
+func TestConfigureLikeRoot_FlagOverridesConfig(t *testing.T) {
 	resetLog(t)
-	viper.Set(config.ViperKeyVerbose, false)
-	viper.Set(config.ViperKeyLogFile, "")
 
 	cmd := testCmdWithLogFlags()
 	if err := cmd.ParseFlags([]string{"-v"}); err != nil {
 		t.Fatal(err)
 	}
 
-	ConfigureFromFlags(cmd.Flags())
+	configureLikeRoot(t, cmd, "verbose: false\n")
 	if !Verbose() {
 		t.Fatal("Verbose() = false, want true")
 	}
 }
 
-func TestConfigureFromFlags_ExpandsHomeInConfigLogFile(t *testing.T) {
+func TestConfigureLikeRoot_ExpandsHomeInConfigLogFile(t *testing.T) {
 	resetLog(t)
-	viper.Set(config.ViperKeyVerbose, true)
-	viper.Set(config.ViperKeyLogFile, "~/homie-configure-from-command.log")
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
 
 	cmd := testCmdWithLogFlags()
-	ConfigureFromFlags(cmd.Flags())
+	configureLikeRoot(t, cmd, "verbose: true\nlog_file: ~/homie-configure-from-command.log\n")
 	Logger().Printf("hello\n")
 
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		t.Fatal(err)
-	}
-	path := filepath.Join(homeDir, "homie-configure-from-command.log")
-	t.Cleanup(func() { _ = os.Remove(path) })
-
+	path := filepath.Join(tmpDir, "homie-configure-from-command.log")
 	if _, err := os.Stat(path); err != nil {
 		t.Fatalf("expected expanded log file at %q: %v", path, err)
 	}
@@ -164,44 +184,46 @@ func TestConfigureFromFlags_ExpandsHomeInConfigLogFile(t *testing.T) {
 	}
 }
 
-func TestConfigureFromFlags_ConfigVerboseAndLogFile_Tees(t *testing.T) {
-	resetLog(t)
-	viper.Set(config.ViperKeyVerbose, true)
-	path := filepath.Join(t.TempDir(), "homie.log")
-	viper.Set(config.ViperKeyLogFile, path)
-
-	cmd := testCmdWithLogFlags()
-	ConfigureFromFlags(cmd.Flags())
-	Logger().Printf("only-file\n")
-
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(data), "only-file") {
-		t.Fatalf("expected log line in file, got %q", string(data))
-	}
-}
-
-func TestConfigureFromFlags_TeeWhenBothFlagsExplicit(t *testing.T) {
-	resetLog(t)
-	viper.Set(config.ViperKeyVerbose, false)
-	path := filepath.Join(t.TempDir(), "homie.log")
-	viper.Set(config.ViperKeyLogFile, "")
-
-	cmd := testCmdWithLogFlags()
-	if err := cmd.ParseFlags([]string{"-v", "--log-file", path}); err != nil {
-		t.Fatal(err)
+func TestConfigureLikeRoot_TeeToFile(t *testing.T) {
+	tests := []struct {
+		name string
+		yaml string
+		args []string
+	}{
+		{
+			name: "from config",
+			yaml: "verbose: true\nlog_file: {{path}}\n",
+		},
+		{
+			name: "from flags override config",
+			yaml: "verbose: false\n",
+			args: []string{"-v", "--log-file"},
+		},
 	}
 
-	ConfigureFromFlags(cmd.Flags())
-	Logger().Printf("tee-line\n")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resetLog(t)
+			path := filepath.Join(t.TempDir(), "homie.log")
 
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(data), "tee-line") {
-		t.Fatalf("expected tee line in file, got %q", string(data))
+			cmd := testCmdWithLogFlags()
+			yaml := strings.ReplaceAll(tt.yaml, "{{path}}", path)
+			if len(tt.args) > 0 {
+				if err := cmd.ParseFlags(append(tt.args, path)); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			configureLikeRoot(t, cmd, yaml)
+			Logger().Printf("tee-line\n")
+
+			data, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(string(data), "tee-line") {
+				t.Fatalf("expected tee line in file, got %q", string(data))
+			}
+		})
 	}
 }

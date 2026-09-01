@@ -6,7 +6,20 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/spf13/viper"
+
+	"github.com/kaliv0/homie/internal/config"
 )
+
+func testConfig(t *testing.T) *config.Config {
+	t.Helper()
+	cfg, err := config.Parse(viper.New())
+	if err != nil {
+		t.Fatalf("Parse() failed: %v", err)
+	}
+	return cfg
+}
 
 func testPIDFile(t *testing.T) string {
 	t.Helper()
@@ -15,15 +28,23 @@ func testPIDFile(t *testing.T) string {
 	return filepath.Join(tmpDir, "homie.pid")
 }
 
+func writePIDFile(t *testing.T, path string, pid int) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(fmt.Sprintf("%d\n", pid)), 0600); err != nil {
+		t.Fatalf("failed to write pidfile: %v", err)
+	}
+}
+
 func TestAcquire_Release(t *testing.T) {
 	testPIDFile(t)
+	cfg := testConfig(t)
 
-	lock, err := Acquire()
+	lock, err := Acquire(cfg)
 	if err != nil {
 		t.Fatalf("Acquire() failed: %v", err)
 	}
 
-	running, pid, err := Status()
+	running, pid, err := Status(cfg)
 	if err != nil {
 		t.Fatalf("Status() failed: %v", err)
 	}
@@ -35,7 +56,7 @@ func TestAcquire_Release(t *testing.T) {
 		t.Fatalf("Release() failed: %v", err)
 	}
 
-	running, _, err = Status()
+	running, _, err = Status(cfg)
 	if err != nil {
 		t.Fatalf("Status() after release failed: %v", err)
 	}
@@ -46,8 +67,9 @@ func TestAcquire_Release(t *testing.T) {
 
 func TestAcquire_AlreadyRunning(t *testing.T) {
 	testPIDFile(t)
+	cfg := testConfig(t)
 
-	lock, err := Acquire()
+	lock, err := Acquire(cfg)
 	if err != nil {
 		t.Fatalf("first Acquire() failed: %v", err)
 	}
@@ -55,7 +77,7 @@ func TestAcquire_AlreadyRunning(t *testing.T) {
 		_ = lock.Release()
 	}()
 
-	_, err = Acquire()
+	_, err = Acquire(cfg)
 	if !errors.Is(err, ErrAlreadyRunning) {
 		t.Fatalf("expected ErrAlreadyRunning, got %v", err)
 	}
@@ -63,32 +85,31 @@ func TestAcquire_AlreadyRunning(t *testing.T) {
 
 func TestStop_NoPidfile(t *testing.T) {
 	testPIDFile(t)
+	cfg := testConfig(t)
 
-	if err := Stop(); err != nil {
+	if err := Stop(cfg); err != nil {
 		t.Fatalf("Stop() with no pidfile failed: %v", err)
 	}
 }
 
 func TestStop_StalePidfile(t *testing.T) {
 	path := testPIDFile(t)
+	cfg := testConfig(t)
 
-	if err := os.WriteFile(path, []byte("999999\n"), 0600); err != nil {
-		t.Fatalf("failed to write stale pidfile: %v", err)
-	}
+	writePIDFile(t, path, 999999)
 
-	if err := Stop(); err != nil {
+	if err := Stop(cfg); err != nil {
 		t.Fatalf("Stop() with stale pid failed: %v", err)
 	}
 }
 
 func TestStatus_StalePidfile(t *testing.T) {
 	path := testPIDFile(t)
+	cfg := testConfig(t)
 
-	if err := os.WriteFile(path, []byte("999999\n"), 0600); err != nil {
-		t.Fatalf("failed to write stale pidfile: %v", err)
-	}
+	writePIDFile(t, path, 999999)
 
-	running, _, err := Status()
+	running, _, err := Status(cfg)
 	if err != nil {
 		t.Fatalf("Status() failed: %v", err)
 	}
@@ -102,12 +123,11 @@ func TestStatus_StalePidfile(t *testing.T) {
 
 func TestStatus_StalePidfileLivePID(t *testing.T) {
 	path := testPIDFile(t)
+	cfg := testConfig(t)
 
-	if err := os.WriteFile(path, []byte(fmt.Sprintf("%d\n", os.Getpid())), 0600); err != nil {
-		t.Fatalf("failed to write stale pidfile: %v", err)
-	}
+	writePIDFile(t, path, os.Getpid())
 
-	running, _, err := Status()
+	running, _, err := Status(cfg)
 	if err != nil {
 		t.Fatalf("Status() failed: %v", err)
 	}

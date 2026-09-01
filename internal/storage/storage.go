@@ -15,11 +15,6 @@ import (
 )
 
 const (
-	DefaultLimit   = 20
-	DefaultMaxSize = 500
-)
-
-const (
 	maxDbConnections = 2
 	connMaxTimespan  = 5 * time.Minute
 	dbBusyTimeout    = 5000 // 5s in milliseconds
@@ -247,23 +242,13 @@ func CleanOldHistory(db *Repository, cfg CleanupConfig) error {
 		return db.DeleteOldest(cfg.TTL)
 	}
 
-	maxSize := cfg.MaxSize
-	if maxSize <= 0 {
-		maxSize = DefaultMaxSize
-	}
-
-	minLimit := cfg.Limit
-	if minLimit <= 0 {
-		minLimit = DefaultLimit
-	}
-
 	total, err := db.Count()
 	if err != nil {
 		return err
 	}
 
-	if total <= maxSize || minLimit >= total {
+	if total <= cfg.MaxSize || cfg.Limit >= total {
 		return nil
 	}
-	return db.DeleteExcess(total - minLimit)
+	return db.DeleteExcess(total - cfg.Limit)
 }

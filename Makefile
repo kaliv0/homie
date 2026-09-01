@@ -1,4 +1,4 @@
-GOLANGCI_VERSION ?= v2.11.4
+GOLANGCI_VERSION ?= v2.13.2
 
 .PHONY: help mod-verify vet lint staticcheck build test test-race all
 

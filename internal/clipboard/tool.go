@@ -3,21 +3,45 @@ package clipboard
 import (
 	"fmt"
 	"os/exec"
+
+	"github.com/kaliv0/homie/internal/config"
 )
+
+const (
+	BinXclip  = "xclip"
+	BinXsel   = "xsel"
+	BinWLCopy = "wl-copy"
+)
+
+// Binary returns the executable name for a config clipboard tool identifier.
+func Binary(tool string) (string, error) {
+	switch tool {
+	case config.ClipboardXclip:
+		return BinXclip, nil
+	case config.ClipboardXsel:
+		return BinXsel, nil
+	case config.ClipboardWLClipboard:
+		return BinWLCopy, nil
+	default:
+		return "", fmt.Errorf("unsupported clipboard tool: %q", tool)
+	}
+}
 
 // Write writes a given string to the clipboard using the specified tool.
 func Write(text, tool string) error {
-	var cmdName string
+	cmdName, err := Binary(tool)
+	if err != nil {
+		return err
+	}
+
 	var args []string
 	switch tool {
-	case "xclip":
-		cmdName, args = "xclip", []string{"-in", "-selection", "clipboard"}
-	case "xsel":
-		cmdName, args = "xsel", []string{"--input", "--clipboard"}
-	case "wl-clipboard":
-		cmdName, args = "wl-copy", []string{}
-	default:
-		return fmt.Errorf("unsupported clipboard tool: %q", tool)
+	case config.ClipboardXclip:
+		args = []string{"-in", "-selection", "clipboard"}
+	case config.ClipboardXsel:
+		args = []string{"--input", "--clipboard"}
+	case config.ClipboardWLClipboard:
+		args = []string{}
 	}
 
 	cmd := exec.Command(cmdName, args...)

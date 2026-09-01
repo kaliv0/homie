@@ -20,9 +20,7 @@ const (
 	KeyCleanUp        = "clean_up"
 	KeyTTL            = "ttl"
 	KeyMaxSize        = "max_size"
-	KeyUseXclip       = "use_xclip"
-	KeyUseXsel        = "use_xsel"
-	KeyUseWLClipboard = "use_wl-clipboard"
+	KeyTool = "tool"
 )
 
 // Cobra flag names only where they differ from Key*.
@@ -59,9 +57,7 @@ func readConfig() error {
 	viper.SetDefault(KeyCleanUp, false)
 	viper.SetDefault(KeyTTL, 0)
 	viper.SetDefault(KeyMaxSize, DefaultMaxSize)
-	viper.SetDefault(KeyUseXclip, false)
-	viper.SetDefault(KeyUseXsel, false)
-	viper.SetDefault(KeyUseWLClipboard, false)
+	viper.SetDefault(KeyTool, "")
 
 	viper.SetConfigName(confFileName)
 	viper.SetConfigType(confFileType)

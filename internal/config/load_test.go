@@ -87,6 +87,12 @@ func TestConfig_normalize(t *testing.T) {
 			verbose:   true,
 			checkWarn: true,
 		},
+		{
+			name:      "clears unknown tool with warning",
+			before:    Config{Tool: "pbcopy", Limit: 15, MaxSize: 300},
+			want:      Config{Tool: "", Limit: 15, MaxSize: 300},
+			checkWarn: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -101,9 +107,9 @@ func TestConfig_normalize(t *testing.T) {
 				c.normalize()
 			}
 
-			if c.Limit != tt.want.Limit || c.TTL != tt.want.TTL || c.MaxSize != tt.want.MaxSize {
-				t.Fatalf("after normalize: got Limit=%d TTL=%d MaxSize=%d, want Limit=%d TTL=%d MaxSize=%d",
-					c.Limit, c.TTL, c.MaxSize, tt.want.Limit, tt.want.TTL, tt.want.MaxSize)
+			if c.Limit != tt.want.Limit || c.TTL != tt.want.TTL || c.MaxSize != tt.want.MaxSize || c.Tool != tt.want.Tool {
+				t.Fatalf("after normalize: got Limit=%d TTL=%d MaxSize=%d Tool=%q, want Limit=%d TTL=%d MaxSize=%d Tool=%q",
+					c.Limit, c.TTL, c.MaxSize, c.Tool, tt.want.Limit, tt.want.TTL, tt.want.MaxSize, tt.want.Tool)
 			}
 
 			if !tt.checkWarn {
@@ -119,6 +125,12 @@ func TestConfig_normalize(t *testing.T) {
 				t.Fatal("expected warnings, got none")
 			}
 			joined := strings.ToLower(stderr)
+			if tt.want.Tool == "" && tt.before.Tool != "" {
+				if !strings.Contains(joined, "tool") {
+					t.Errorf("expected warning mentioning tool, got %q", stderr)
+				}
+				return
+			}
 			for _, key := range []string{"limit", "ttl", "max_size"} {
 				if !strings.Contains(joined, key) {
 					t.Errorf("expected warning mentioning %q, got %q", key, stderr)
@@ -145,16 +157,16 @@ func TestParse(t *testing.T) {
 				if cfg.Limit != DefaultLimit || cfg.MaxSize != DefaultMaxSize || cfg.TTL != 0 {
 					t.Fatalf("unexpected defaults: %+v", cfg)
 				}
-				if cfg.ClipboardTool != "" {
-					t.Fatalf("ClipboardTool = %q, want empty", cfg.ClipboardTool)
+				if cfg.Tool != "" {
+					t.Fatalf("Tool = %q, want empty", cfg.Tool)
 				}
 			},
 		},
 		{
 			name: "valid config",
-			yaml: "limit: 10\nclean_up: true\nttl: 7\nuse_xclip: true\n",
+			yaml: "limit: 10\nclean_up: true\nttl: 7\ntool: xclip\n",
 			check: func(t *testing.T, cfg *Config) {
-				if cfg.Limit != 10 || !cfg.CleanUp || cfg.TTL != 7 || cfg.ClipboardTool != ClipboardXclip {
+				if cfg.Limit != 10 || !cfg.CleanUp || cfg.TTL != 7 || cfg.Tool != ClipboardXclip {
 					t.Fatalf("cfg = %+v, unexpected values", cfg)
 				}
 			},
@@ -169,25 +181,29 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
-			name:    "rejects multiple clipboard tools",
-			yaml:    "use_xclip: true\nuse_xsel: true\n",
-			wantErr: "clipboard",
-		},
-		{
-			name: "selects xsel",
-			yaml: "use_xsel: true\n",
+			name: "clears unknown tool",
+			yaml: "tool: pbcopy\n",
 			check: func(t *testing.T, cfg *Config) {
-				if cfg.ClipboardTool != ClipboardXsel {
-					t.Fatalf("ClipboardTool = %q, want %q", cfg.ClipboardTool, ClipboardXsel)
+				if cfg.Tool != "" {
+					t.Fatalf("Tool = %q, want empty", cfg.Tool)
 				}
 			},
 		},
 		{
-			name: "selects wl-clipboard",
-			yaml: "use_wl-clipboard: true\n",
+			name: "accepts xsel",
+			yaml: "tool: xsel\n",
 			check: func(t *testing.T, cfg *Config) {
-				if cfg.ClipboardTool != ClipboardWLClipboard {
-					t.Fatalf("ClipboardTool = %q, want %q", cfg.ClipboardTool, ClipboardWLClipboard)
+				if cfg.Tool != ClipboardXsel {
+					t.Fatalf("Tool = %q, want %q", cfg.Tool, ClipboardXsel)
+				}
+			},
+		},
+		{
+			name: "accepts wl-clipboard",
+			yaml: "tool: wl-clipboard\n",
+			check: func(t *testing.T, cfg *Config) {
+				if cfg.Tool != ClipboardWLClipboard {
+					t.Fatalf("Tool = %q, want %q", cfg.Tool, ClipboardWLClipboard)
 				}
 			},
 		},

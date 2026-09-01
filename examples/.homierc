@@ -2,9 +2,7 @@ limit: 15                            # minimum amount after clean_up
 #max_size: 500                       # maximum amount of stored records
 ttl: 7                               # retention period in days
 clean_up: false                      # skip clean_up step entirely
-use_xclip: true                      # use xclip for clipboard text management on linux
-#use_xsel: false                     # use xsel
-#use_wl-clipboard: false             # or wl-clipboard for the same reason
+tool: xclip                          # xclip, xsel, or wl-clipboard (clipboard text management on linux)
 #verbose: true                       # default when -v/--verbose is omitted
 #log_file: ~/.local/state/homie.log  # append logs here (file permissions -> 0o600)
 #pid_file: ~/.local/state/homie.pid # daemon pidfile (default -> $XDG_RUNTIME_DIR/homie.pid)

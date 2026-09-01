@@ -106,10 +106,10 @@ func clipboardTool(cfg *config.Config) (string, error) {
 		return "", nil
 	}
 
-	tool := cfg.ClipboardTool
+	tool := cfg.Tool
 	if tool == "" {
 		return "", fmt.Errorf(
-			"command-line tool not selected, choose between: %s, %s or %s",
+			"clipboard tool not set: add %s, %s, or %s to ~/.homierc",
 			config.ClipboardXclip, config.ClipboardXsel, config.ClipboardWLClipboard,
 		)
 	}

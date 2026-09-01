@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -30,25 +31,20 @@ type Config struct {
 	TTL     int
 	MaxSize int
 
-	ClipboardTool string
+	Tool string
 }
 
 // Parse builds Config from a populated viper instance (after ReadConfig).
 func Parse(v *viper.Viper) (*Config, error) {
-	clipboard, err := resolveClipboard(v)
-	if err != nil {
-		return nil, err
-	}
-
 	c := &Config{
-		Verbose:       v.GetBool(KeyVerbose),
-		LogFile:       v.GetString(KeyLogFile),
-		PIDFile:       v.GetString(KeyPIDFile),
-		Limit:         v.GetInt(KeyLimit),
-		CleanUp:       v.GetBool(KeyCleanUp),
-		TTL:           v.GetInt(KeyTTL),
-		MaxSize:       v.GetInt(KeyMaxSize),
-		ClipboardTool: clipboard,
+		Verbose: v.GetBool(KeyVerbose),
+		LogFile: v.GetString(KeyLogFile),
+		PIDFile: v.GetString(KeyPIDFile),
+		Limit:   v.GetInt(KeyLimit),
+		CleanUp: v.GetBool(KeyCleanUp),
+		TTL:     v.GetInt(KeyTTL),
+		MaxSize: v.GetInt(KeyMaxSize),
+		Tool:    strings.TrimSpace(v.GetString(KeyTool)),
 	}
 	c.normalize()
 	return c, nil
@@ -62,55 +58,39 @@ func BindFlag(key string, flag *pflag.Flag) {
 	}
 }
 
-func resolveClipboard(v *viper.Viper) (string, error) {
-	type toolKey struct {
-		key  string
-		tool string
-	}
-	keys := []toolKey{
-		{KeyUseXclip, ClipboardXclip},
-		{KeyUseXsel, ClipboardXsel},
-		{KeyUseWLClipboard, ClipboardWLClipboard},
-	}
-
-	var chosen string
-	enabled := 0
-	for _, tk := range keys {
-		if v.GetBool(tk.key) {
-			enabled++
-			chosen = tk.tool
+func (c *Config) normalize() {
+	if c.Tool != "" {
+		switch c.Tool {
+		case ClipboardXclip, ClipboardXsel, ClipboardWLClipboard:
+		default:
+			// NB: always warn user if clipboard tool is messed up
+			fmt.Fprintf(os.Stderr,
+				"config: unknown tool %q, ignoring (want %q, %q, or %q)\n",
+				c.Tool, ClipboardXclip, ClipboardXsel, ClipboardWLClipboard,
+			)
+			c.Tool = ""
 		}
 	}
-	if enabled > 1 {
-		return "", fmt.Errorf(
-			"config: only one clipboard tool may be enabled (%s, %s, %s)",
-			KeyUseXclip, KeyUseXsel, KeyUseWLClipboard,
-		)
-	}
-	if enabled == 1 {
-		return chosen, nil
-	}
-	return "", nil
-}
 
-func (c *Config) normalize() {
-	warn := func(string) {}
+	warn := func(string, ...any) {}
 	if c.Verbose {
-		warn = func(msg string) { fmt.Fprintln(os.Stderr, msg) }
+		warn = func(format string, args ...any) {
+			fmt.Fprintf(os.Stderr, format, args...)
+		}
 	}
 
 	if c.TTL < 0 {
-		warn(fmt.Sprintf("config: ttl %d is negative, using 0", c.TTL))
+		warn("config: ttl %d is negative, using 0\n", c.TTL)
 		c.TTL = 0
 	}
 	if c.Limit < 0 {
-		warn(fmt.Sprintf("config: limit %d is negative, using %d", c.Limit, DefaultLimit))
+		warn("config: limit %d is negative, using %d\n", c.Limit, DefaultLimit)
 		c.Limit = DefaultLimit
 	} else if c.Limit == 0 {
 		c.Limit = DefaultLimit
 	}
 	if c.MaxSize < 0 {
-		warn(fmt.Sprintf("config: max_size %d is negative, using %d", c.MaxSize, DefaultMaxSize))
+		warn("config: max_size %d is negative, using %d\n", c.MaxSize, DefaultMaxSize)
 		c.MaxSize = DefaultMaxSize
 	} else if c.MaxSize == 0 {
 		c.MaxSize = DefaultMaxSize

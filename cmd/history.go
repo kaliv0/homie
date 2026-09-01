@@ -4,11 +4,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"runtime"
 	"strings"
 
 	"github.com/spf13/cobra"
-	gclip "golang.design/x/clipboard"
 
 	"github.com/kaliv0/homie/internal/clipboard"
 	"github.com/kaliv0/homie/internal/config"
@@ -86,42 +84,7 @@ func fetchDisplayHistory(cfg *config.Config) (string, error) {
 }
 
 func writeToClipboard(cfg *config.Config, text string) error {
-	tool, err := clipboardTool(cfg)
-	if err != nil {
-		return err
-	}
-	if tool != "" {
-		return clipboard.Write(text, tool)
-	}
-
-	if err = gclip.Init(); err != nil {
-		return fmt.Errorf("failed to initialize clipboard: %w", err)
-	}
-	gclip.Write(gclip.FmtText, []byte(text))
-	return nil
-}
-
-func clipboardTool(cfg *config.Config) (string, error) {
-	if runtime.GOOS != "linux" {
-		return "", nil
-	}
-
-	tool := cfg.Tool
-	if tool == "" {
-		return "", fmt.Errorf(
-			"clipboard tool not set: add %s, %s, or %s to ~/.homierc",
-			config.ClipboardXclip, config.ClipboardXsel, config.ClipboardWLClipboard,
-		)
-	}
-
-	bin, err := clipboard.Binary(tool)
-	if err != nil {
-		return "", err
-	}
-	if _, err := exec.LookPath(bin); err != nil {
-		return "", fmt.Errorf("%s not found: %w", tool, err)
-	}
-	return tool, nil
+	return clipboard.WriteSelection(text, cfg.Tool)
 }
 
 func pasteText(text string) error {

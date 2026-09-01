@@ -132,11 +132,8 @@ func (r *Repository) Read(offset, limit int) ([]ClipboardItem, error) {
 
 // Write inserts a new clipboard item or updates timestamp if it already exists.
 func (r *Repository) Write(item []byte) error {
-	hasher := sha256.New()
-	if _, err := hasher.Write(item); err != nil {
-		return fmt.Errorf("failed to hash clipboard item (length=%d): %w", len(item), err)
-	}
-	textHash := hex.EncodeToString(hasher.Sum(nil))
+	sum := sha256.Sum256(item)
+	textHash := hex.EncodeToString(sum[:])
 
 	var existingItem ClipboardItem
 	err := r.db.Get(&existingItem, `

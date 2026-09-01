@@ -59,17 +59,13 @@ func BindFlag(key string, flag *pflag.Flag) {
 }
 
 func (c *Config) normalize() {
-	if c.Tool != "" {
-		switch c.Tool {
-		case ClipboardXclip, ClipboardXsel, ClipboardWLClipboard:
-		default:
-			// NB: always warn user if clipboard tool is messed up
-			fmt.Fprintf(os.Stderr,
-				"config: unknown tool %q, ignoring (want %q, %q, or %q)\n",
-				c.Tool, ClipboardXclip, ClipboardXsel, ClipboardWLClipboard,
-			)
-			c.Tool = ""
-		}
+	if c.Tool != "" && !knownTool(c.Tool) {
+		// NB: always warn user if clipboard tool is messed up
+		fmt.Fprintf(os.Stderr,
+			"config: unknown tool %q, ignoring (want %q, %q, or %q)\n",
+			c.Tool, ClipboardXclip, ClipboardXsel, ClipboardWLClipboard,
+		)
+		c.Tool = ""
 	}
 
 	warn := func(string, ...any) {}
@@ -83,17 +79,29 @@ func (c *Config) normalize() {
 		warn("config: ttl %d is negative, using 0\n", c.TTL)
 		c.TTL = 0
 	}
+
 	if c.Limit < 0 {
 		warn("config: limit %d is negative, using %d\n", c.Limit, DefaultLimit)
 		c.Limit = DefaultLimit
 	} else if c.Limit == 0 {
 		c.Limit = DefaultLimit
 	}
+
 	if c.MaxSize < 0 {
 		warn("config: max_size %d is negative, using %d\n", c.MaxSize, DefaultMaxSize)
 		c.MaxSize = DefaultMaxSize
 	} else if c.MaxSize == 0 {
 		c.MaxSize = DefaultMaxSize
 	}
+
 	c.resolvePaths()
+}
+
+func knownTool(tool string) bool {
+	switch tool {
+	case ClipboardXclip, ClipboardXsel, ClipboardWLClipboard:
+		return true
+	default:
+		return false
+	}
 }

@@ -1,6 +1,6 @@
 module github.com/kaliv0/homie
 
-go 1.26.1
+go 1.27.0
 
 require (
 	github.com/jmoiron/sqlx v1.4.0

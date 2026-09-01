@@ -4,12 +4,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"runtime"
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
-	gclip "golang.design/x/clipboard"
 
 	"github.com/kaliv0/homie/internal/clipboard"
 	"github.com/kaliv0/homie/internal/config"
@@ -25,7 +22,7 @@ var (
 		Long: `List clipboard history
   Use <tab> to pin and select multiple entries`,
 		Run: func(cmd *cobra.Command, _ []string) {
-			output, err := fetchDisplayHistory()
+			output, err := fetchDisplayHistory(cfg)
 			if err != nil {
 				log.Logger().Fatal(err)
 			}
@@ -33,7 +30,7 @@ var (
 				return
 			}
 
-			if err = writeToClipboard(output); err != nil {
+			if err = writeToClipboard(cfg, output); err != nil {
 				log.Logger().Fatal(err)
 			}
 
@@ -78,53 +75,16 @@ var (
 	}
 )
 
-func fetchDisplayHistory() (string, error) {
-	// limit via viper + BindPFlag: --limit/-l if set, else .homierc, else flag default.
-	limit := viper.GetInt("limit")
-	if limit <= 0 {
-		limit = storage.DefaultLimit
-	}
-
+func fetchDisplayHistory(cfg *config.Config) (string, error) {
 	dbPath, err := config.DBPath()
 	if err != nil {
 		return "", err
 	}
-	return finder.ListHistory(dbPath, limit)
+	return finder.ListHistory(dbPath, cfg.Limit)
 }
 
-func writeToClipboard(text string) error {
-	tool, err := clipboardTool()
-	if err != nil {
-		return err
-	}
-	if tool != "" {
-		return clipboard.Write(text, tool)
-	}
-
-	if err = gclip.Init(); err != nil {
-		return fmt.Errorf("failed to initialize clipboard: %w", err)
-	}
-	gclip.Write(gclip.FmtText, []byte(text))
-	return nil
-}
-
-func clipboardTool() (string, error) {
-	if runtime.GOOS != "linux" {
-		return "", nil
-	}
-	for tool, cmd := range map[string]string{
-		"xclip":        "xclip",
-		"xsel":         "xsel",
-		"wl-clipboard": "wl-copy",
-	} {
-		if viper.GetBool("use_" + tool) {
-			if _, err := exec.LookPath(cmd); err != nil {
-				return "", fmt.Errorf("%s not found: %w", tool, err)
-			}
-			return tool, nil
-		}
-	}
-	return "", fmt.Errorf("command-line tool not selected, choose between: xclip, xsel or wl-clipboard")
+func writeToClipboard(cfg *config.Config, text string) error {
+	return clipboard.WriteSelection(text, cfg.Tool)
 }
 
 func pasteText(text string) error {
@@ -151,9 +111,9 @@ func pasteText(text string) error {
 
 func init() {
 	listHistoryCmd.Flags().IntP(
-		"limit",
+		config.KeyLimit,
 		"l",
-		storage.DefaultLimit,
+		config.DefaultLimit,
 		"Limit the number of clipboard history items displayed",
 	)
 	listHistoryCmd.Flags().BoolP(
@@ -163,10 +123,7 @@ func init() {
 		"Paste selected history item",
 	)
 
-	if err := viper.BindPFlag("limit", listHistoryCmd.Flags().Lookup("limit")); err != nil {
-		log.Logger().Fatalf("failed to bind 'limit' flag to viper: %v", err)
-	}
-	viper.SetDefault("use_xclip", false)
+	config.BindFlag(config.KeyLimit, listHistoryCmd.Flags().Lookup(config.KeyLimit))
 
 	rootCmd.AddCommand(listHistoryCmd)
 	rootCmd.AddCommand(clearHistoryCmd)

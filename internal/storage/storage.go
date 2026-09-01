@@ -15,11 +15,6 @@ import (
 )
 
 const (
-	DefaultLimit   = 20
-	DefaultMaxSize = 500
-)
-
-const (
 	maxDbConnections = 2
 	connMaxTimespan  = 5 * time.Minute
 	dbBusyTimeout    = 5000 // 5s in milliseconds
@@ -137,11 +132,8 @@ func (r *Repository) Read(offset, limit int) ([]ClipboardItem, error) {
 
 // Write inserts a new clipboard item or updates timestamp if it already exists.
 func (r *Repository) Write(item []byte) error {
-	hasher := sha256.New()
-	if _, err := hasher.Write(item); err != nil {
-		return fmt.Errorf("failed to hash clipboard item (length=%d): %w", len(item), err)
-	}
-	textHash := hex.EncodeToString(hasher.Sum(nil))
+	sum := sha256.Sum256(item)
+	textHash := hex.EncodeToString(sum[:])
 
 	var existingItem ClipboardItem
 	err := r.db.Get(&existingItem, `
@@ -247,23 +239,13 @@ func CleanOldHistory(db *Repository, cfg CleanupConfig) error {
 		return db.DeleteOldest(cfg.TTL)
 	}
 
-	maxSize := cfg.MaxSize
-	if maxSize <= 0 {
-		maxSize = DefaultMaxSize
-	}
-
-	minLimit := cfg.Limit
-	if minLimit <= 0 {
-		minLimit = DefaultLimit
-	}
-
 	total, err := db.Count()
 	if err != nil {
 		return err
 	}
 
-	if total <= maxSize || minLimit >= total {
+	if total <= cfg.MaxSize || cfg.Limit >= total {
 		return nil
 	}
-	return db.DeleteExcess(total - minLimit)
+	return db.DeleteExcess(total - cfg.Limit)
 }

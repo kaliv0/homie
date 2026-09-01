@@ -11,11 +11,21 @@ import (
 	"github.com/spf13/viper"
 )
 
-// Viper keys (and YAML keys in .homierc).
+// Config file / viper keys (~/.homierc).
 const (
-	ViperKeyVerbose = "verbose"
-	ViperKeyLogFile = "log_file"
-	ViperKeyPIDFile = "pid_file"
+	KeyVerbose        = "verbose"
+	KeyLogFile        = "log_file"
+	KeyPIDFile        = "pid_file"
+	KeyLimit          = "limit"
+	KeyCleanUp        = "clean_up"
+	KeyTTL            = "ttl"
+	KeyMaxSize        = "max_size"
+	KeyTool = "tool"
+)
+
+// Cobra flag names only where they differ from Key*.
+const (
+	FlagLogFile = "log-file"
 )
 
 const (
@@ -40,9 +50,14 @@ const (
 var ReadConfig = sync.OnceValue(readConfig)
 
 func readConfig() error {
-	viper.SetDefault(ViperKeyVerbose, false)
-	viper.SetDefault(ViperKeyLogFile, "")
-	viper.SetDefault(ViperKeyPIDFile, "")
+	viper.SetDefault(KeyVerbose, false)
+	viper.SetDefault(KeyLogFile, "")
+	viper.SetDefault(KeyPIDFile, "")
+	viper.SetDefault(KeyLimit, DefaultLimit)
+	viper.SetDefault(KeyCleanUp, false)
+	viper.SetDefault(KeyTTL, 0)
+	viper.SetDefault(KeyMaxSize, DefaultMaxSize)
+	viper.SetDefault(KeyTool, "")
 
 	viper.SetConfigName(confFileName)
 	viper.SetConfigType(confFileType)
@@ -86,34 +101,32 @@ func DBPath() (string, error) {
 	return dbPath, pathErr
 }
 
-// PIDFilePath returns the path to the daemon pidfile.
-func PIDFilePath() (string, error) {
-	if err := ReadConfig(); err != nil {
-		return "", err
+// PreparePIDFile ensures the pidfile parent directory exists.
+func (c *Config) PreparePIDFile() error {
+	if err := os.MkdirAll(filepath.Dir(c.PIDFile), dbConfDirPerm); err != nil {
+		return fmt.Errorf("failed to create pidfile directory: %w", err)
 	}
-	if p := ExpandHomePath(strings.TrimSpace(viper.GetString(ViperKeyPIDFile))); p != "" {
-		return p, nil
-	}
+	return nil
+}
 
+func (c *Config) resolvePaths() {
+	c.LogFile = expandHomePath(c.LogFile)
+	c.PIDFile = expandHomePath(c.PIDFile)
+	if c.PIDFile == "" {
+		c.resolvePIDFileDefault()
+	}
+}
+
+func (c *Config) resolvePIDFileDefault() {
 	if xdg := os.Getenv(xdgRuntime); xdg != "" {
-		return filepath.Join(xdg, pidFileName), nil
+		c.PIDFile = filepath.Join(xdg, pidFileName)
+		return
 	}
-	return filepath.Join(runDir, fmt.Sprintf("%d", os.Getuid()), pidFileName), nil
+	c.PIDFile = filepath.Join(runDir, fmt.Sprintf("%d", os.Getuid()), pidFileName)
 }
 
-// PreparePIDFile returns the pidfile path and ensures its parent directory exists.
-func PreparePIDFile() (string, error) {
-	path, err := PIDFilePath()
-	if err != nil {
-		return "", err
-	}
-	if err = os.MkdirAll(filepath.Dir(path), dbConfDirPerm); err != nil {
-		return "", fmt.Errorf("failed to create pidfile directory: %w", err)
-	}
-	return path, nil
-}
-
-func ExpandHomePath(p string) string {
+func expandHomePath(p string) string {
+	p = strings.TrimSpace(p)
 	if p == "" || !strings.HasPrefix(p, homeDirPrefix) {
 		return p
 	}

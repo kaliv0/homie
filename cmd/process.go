@@ -10,7 +10,6 @@ import (
 	"syscall"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	gclip "golang.design/x/clipboard"
 
 	"github.com/kaliv0/homie/internal/clipboard"
@@ -26,7 +25,7 @@ var (
 		Short:                 "Start clipboard manager",
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, _ []string) {
-			running, _, err := daemon.Status()
+			running, _, err := daemon.Status(cfg)
 			if err != nil {
 				log.Logger().Fatal(err)
 			}
@@ -48,7 +47,7 @@ var (
 		Short:                 "Restart clipboard manager",
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, _ []string) {
-			if err := daemon.Stop(); err != nil {
+			if err := daemon.Stop(cfg); err != nil {
 				log.Logger().Fatal(err)
 			}
 			runDaemon(cmd)
@@ -62,7 +61,7 @@ var (
 		Use:    "run",
 		Hidden: true,
 		Run: func(cmd *cobra.Command, _ []string) {
-			lock, err := daemon.Acquire()
+			lock, err := daemon.Acquire(cfg)
 			if err != nil {
 				if errors.Is(err, daemon.ErrAlreadyRunning) {
 					if log.Verbose() {
@@ -102,13 +101,13 @@ var (
 				log.Logger().Fatal(err)
 			}
 
-			cfg := storage.CleanupConfig{
-				CleanUp: viper.GetBool("clean_up"),
-				TTL:     viper.GetInt("ttl"),
-				MaxSize: viper.GetInt("max_size"),
-				Limit:   viper.GetInt("limit"),
+			cleanup := storage.CleanupConfig{
+				CleanUp: cfg.CleanUp,
+				TTL:     cfg.TTL,
+				MaxSize: cfg.MaxSize,
+				Limit:   cfg.Limit,
 			}
-			if err := storage.CleanOldHistory(db, cfg); err != nil {
+			if err := storage.CleanOldHistory(db, cleanup); err != nil {
 				log.Logger().Println(err)
 			}
 
@@ -133,7 +132,7 @@ var (
 		Short:                 "Stop clipboard manager",
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, _ []string) {
-			if err := daemon.Stop(); err != nil {
+			if err := daemon.Stop(cfg); err != nil {
 				log.Logger().Fatal(err)
 			}
 			if log.Verbose() {
@@ -147,7 +146,7 @@ var (
 		Short:                 "Show clipboard manager daemon status",
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, _ []string) {
-			running, pid, err := daemon.Status()
+			running, pid, err := daemon.Status(cfg)
 			if err != nil {
 				log.Logger().Fatal(err)
 			}

@@ -303,21 +303,6 @@ func TestRead_Limits(t *testing.T) {
 
 func TestRead_Pagination(t *testing.T) {
 	repo := setupTestDB(t)
-	seedItems(t, repo, 5)
-
-	page1 := mustRead(t, repo, 0, 2)
-	page2 := mustRead(t, repo, 2, 2)
-
-	if len(page1) != 2 || len(page2) != 2 {
-		t.Fatalf("expected 2 items per page, got %d and %d", len(page1), len(page2))
-	}
-	if page1[0].ClipText == page2[0].ClipText {
-		t.Error("page1 and page2 returned the same items")
-	}
-}
-
-func TestRead_PaginationConsistency(t *testing.T) {
-	repo := setupTestDB(t)
 	seedItems(t, repo, 10)
 
 	var all []ClipboardItem
@@ -340,14 +325,24 @@ func TestRead_PaginationConsistency(t *testing.T) {
 }
 
 func TestCount(t *testing.T) {
-	repo := setupTestDB(t)
-	seedItems(t, repo, 3)
-	assertCount(t, repo, 3)
-}
+	tests := []struct {
+		name  string
+		seedN int
+		want  int
+	}{
+		{"empty", 0, 0},
+		{"with items", 3, 3},
+	}
 
-func TestCount_Empty(t *testing.T) {
-	repo := setupTestDB(t)
-	assertCount(t, repo, 0)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := setupTestDB(t)
+			if tt.seedN > 0 {
+				seedItems(t, repo, tt.seedN)
+			}
+			assertCount(t, repo, tt.want)
+		})
+	}
 }
 
 func TestDeleteExcess(t *testing.T) {
@@ -482,7 +477,7 @@ func TestCleanOldHistory_TTLTakesPrecedenceOverMaxSize(t *testing.T) {
 	seedItems(t, repo, 10)
 	insertOldItem(t, repo, "old-0", "oldhash-prec0", 20)
 	insertOldItem(t, repo, "old-1", "oldhash-prec1", 20)
-	// TTL=7 removes only the 2 old items; max_size=5 would trim more but is ignored
+	// TTL=7 removes only the 2 old items. max_size=5 would trim more but is ignored
 	cfg := CleanupConfig{CleanUp: true, TTL: 7, MaxSize: 5, Limit: 5}
 
 	if err := CleanOldHistory(repo, cfg); err != nil {
@@ -499,11 +494,14 @@ func TestCleanOldHistory_MaxSize(t *testing.T) {
 		maxSize   int
 		limit     int
 		wantCount int
+		wantTexts []string // when set, verify surviving rows (newest-first)
 	}{
-		{"trims to limit", 10, 5, 5, 5},
-		{"under limit no-op", 3, 10, 5, 3},
-		{"limit equals total", 10, 5, 10, 10},
-		{"max_size one item", 5, 1, 1, 1},
+		{"trims to limit", 10, 5, 5, 5, []string{"item-9", "item-8", "item-7", "item-6", "item-5"}},
+		{"under limit no-op", 3, 10, 5, 3, nil},
+		{"limit equals total", 10, 5, 10, 10, nil},
+		{"max_size one item", 5, 1, 1, 1, nil},
+		{"no-op when total at or below max_size", 5, 10, 3, 5, nil},
+		{"no-op when min limit reaches total", 5, 3, 5, 5, nil},
 	}
 
 	for _, tt := range tests {
@@ -517,33 +515,19 @@ func TestCleanOldHistory_MaxSize(t *testing.T) {
 				t.Fatalf("CleanOldHistory() failed: %v", err)
 			}
 			assertCount(t, repo, tt.wantCount)
-		})
-	}
-}
 
-func TestCleanOldHistory_DefaultsWhenZeroOrNegative(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name    string
-		maxSize int
-		limit   int
-	}{
-		{"zero values", 0, 0},
-		{"negative values", -1, -5},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			repo := setupTestDB(t)
-			seedItems(t, repo, 3)
-
-			cfg := CleanupConfig{CleanUp: true, TTL: 0, MaxSize: tt.maxSize, Limit: tt.limit}
-			if err := CleanOldHistory(repo, cfg); err != nil {
-				t.Fatalf("CleanOldHistory() failed: %v", err)
+			if tt.wantTexts == nil {
+				return
 			}
-			// 3 items is well under DefaultMaxSize (500), so no deletion
-			assertCount(t, repo, 3)
+			items := mustRead(t, repo, 0, 10)
+			if len(items) != len(tt.wantTexts) {
+				t.Fatalf("expected %d items, got %d", len(tt.wantTexts), len(items))
+			}
+			for i, w := range tt.wantTexts {
+				if items[i].ClipText != w {
+					t.Errorf("item[%d]: want %q, got %q", i, w, items[i].ClipText)
+				}
+			}
 		})
 	}
 }
@@ -560,58 +544,11 @@ func TestDeleteExcess_DeletesOldestRowsFirst(t *testing.T) {
 	if len(items) != 3 {
 		t.Fatalf("expected 3 items after deleting 2 oldest, got %d", len(items))
 	}
-	// Read is newest-first; survivors should be item-4, item-3, item-2
+	// Read is newest-first. Survivors should be item-4, item-3, item-2
 	want := []string{"item-4", "item-3", "item-2"}
 	for i, w := range want {
 		if items[i].ClipText != w {
 			t.Errorf("item[%d]: want clip_text %q, got %q", i, w, items[i].ClipText)
-		}
-	}
-}
-
-func TestCleanOldHistory_NoOpWhenTotalAtOrBelowMaxSize(t *testing.T) {
-	t.Parallel()
-	repo := setupTestDB(t)
-	seedItems(t, repo, 5)
-
-	cfg := CleanupConfig{CleanUp: true, TTL: 0, MaxSize: 10, Limit: 3}
-	if err := CleanOldHistory(repo, cfg); err != nil {
-		t.Fatalf("CleanOldHistory() failed: %v", err)
-	}
-	assertCount(t, repo, 5)
-}
-
-func TestCleanOldHistory_NoOpWhenMinLimitReachesTotal(t *testing.T) {
-	t.Parallel()
-	repo := setupTestDB(t)
-	seedItems(t, repo, 5)
-
-	// total > maxSize would normally trim, but minLimit >= total short-circuits
-	cfg := CleanupConfig{CleanUp: true, TTL: 0, MaxSize: 3, Limit: 5}
-	if err := CleanOldHistory(repo, cfg); err != nil {
-		t.Fatalf("CleanOldHistory() failed: %v", err)
-	}
-	assertCount(t, repo, 5)
-}
-
-func TestCleanOldHistory_MaxSizeKeepsNewestRows(t *testing.T) {
-	t.Parallel()
-	repo := setupTestDB(t)
-	seedItems(t, repo, 10)
-
-	cfg := CleanupConfig{CleanUp: true, TTL: 0, MaxSize: 5, Limit: 5}
-	if err := CleanOldHistory(repo, cfg); err != nil {
-		t.Fatalf("CleanOldHistory() failed: %v", err)
-	}
-
-	items := mustRead(t, repo, 0, 10)
-	if len(items) != 5 {
-		t.Fatalf("expected 5 items, got %d", len(items))
-	}
-	want := []string{"item-9", "item-8", "item-7", "item-6", "item-5"}
-	for i, w := range want {
-		if items[i].ClipText != w {
-			t.Errorf("item[%d]: want %q, got %q", i, w, items[i].ClipText)
 		}
 	}
 }

@@ -27,12 +27,11 @@ type Lock struct {
 }
 
 // Acquire opens the pidfile, takes an exclusive lock, and writes the current PID.
-func Acquire() (*Lock, error) {
-	// find path and open file
-	path, err := config.PreparePIDFile()
-	if err != nil {
+func Acquire(cfg *config.Config) (*Lock, error) {
+	if err := cfg.PreparePIDFile(); err != nil {
 		return nil, err
 	}
+	path := cfg.PIDFile
 
 	f, err := os.OpenFile(path, pidFileFlags, pidFilePerm)
 	if err != nil {
@@ -70,13 +69,8 @@ func (l *Lock) Release() error {
 }
 
 // Status reports whether a daemon holds the pidfile lock.
-func Status() (bool, int, error) {
-	// find path to pidfile
-	path, err := config.PIDFilePath()
-	if err != nil {
-		return false, 0, err
-	}
-	// open file
+func Status(cfg *config.Config) (bool, int, error) {
+	path := cfg.PIDFile
 	f, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -90,34 +84,27 @@ func Status() (bool, int, error) {
 		}
 	}()
 
-	// try to acquire lock
 	if err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
 		if errors.Is(err, syscall.EWOULDBLOCK) {
-			// file already locked -> another instance is running
 			pid, err := readPID(path)
 			if err != nil {
 				return false, 0, err
 			}
-			// return pid of running instance
 			return true, pid, nil
 		}
 		return false, 0, err
 	}
 
-	// if we were able to acquire lock to existing file -> it is stale,
-	// leftover from a previous instance no longer holding the lock
 	_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
 	return false, 0, nil
 }
 
 // Stop sends SIGTERM to the daemon PID from the pidfile.
-func Stop() error {
-	// check if running
-	running, pid, err := Status()
+func Stop(cfg *config.Config) error {
+	running, pid, err := Status(cfg)
 	if err != nil || !running {
 		return err
 	}
-	// find running process & terminate it
 	proc, err := os.FindProcess(pid)
 	if err != nil {
 		return err

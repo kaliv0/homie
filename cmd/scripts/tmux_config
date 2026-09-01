@@ -13,8 +13,8 @@ bind-key -T copy-mode-vi y send-keys -X copy-pipe-and-cancel "homie write"
 ## Copy selection to system clipboard and homie history (emacs copy mode)
 # bind-key -T copy-mode Enter send-keys -X copy-pipe-and-cancel "homie write"
 
-## If 'use_xclip: true' in your .homierc you can pipe directly to xclip
+## With tool: xclip in your .homierc you can pipe directly to xclip
 # bind-key -T copy-mode Enter send-keys -X copy-pipe-and-cancel "xclip -in -selection clipboard"
 
-## Similarly for use_xsel:
+## Similarly for xsel:
 # bind-key -T copy-mode Enter send-keys -X copy-pipe-and-cancel "xsel --input --clipboard"

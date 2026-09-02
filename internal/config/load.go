@@ -3,7 +3,6 @@ package config
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/spf13/viper"
 )
@@ -36,14 +35,14 @@ type Config struct {
 // Parse builds Config from a populated viper instance (after ReadConfig).
 func Parse(v *viper.Viper) (*Config, error) {
 	c := &Config{
-		Verbose: v.GetBool(KeyVerbose),
-		LogFile: v.GetString(KeyLogFile),
-		PIDFile: v.GetString(KeyPIDFile),
-		MinSize: v.GetInt(KeyMinSize),
-		CleanUp: v.GetBool(KeyCleanUp),
-		TTL:     v.GetInt(KeyTTL),
-		MaxSize: v.GetInt(KeyMaxSize),
-		Tool:    strings.TrimSpace(v.GetString(KeyTool)),
+		Verbose: v.GetBool(Verbose),
+		LogFile: v.GetString(LogFile),
+		PIDFile: v.GetString(PIDFile),
+		MinSize: v.GetInt(MinSize),
+		CleanUp: v.GetBool(CleanUp),
+		TTL:     v.GetInt(TTL),
+		MaxSize: v.GetInt(MaxSize),
+		Tool:    v.GetString(Tool),
 	}
 	c.normalize()
 	return c, nil

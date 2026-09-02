@@ -228,7 +228,7 @@ func TestParse(t *testing.T) {
 		{
 			name: "expands log file path",
 			setup: func(v *viper.Viper) {
-				v.Set(KeyLogFile, "~/homie.log")
+				v.Set(LogFile, "~/homie.log")
 			},
 			check: func(t *testing.T, cfg *Config) {
 				want := filepath.Join(tmpDir, "homie.log")

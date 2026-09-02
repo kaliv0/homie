@@ -30,7 +30,7 @@ const (
 	appConfPath   = "$HOME/"
 	homeDirPrefix = "~/"
 
-	dbConfDirPerm = 0755
+	dbConfDirPerm = 0o700
 	dbConfDirName = ".config"
 	dbSubdirName  = "homie"
 	dbFileName    = "homie.db"

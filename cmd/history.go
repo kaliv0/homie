@@ -15,6 +15,8 @@ import (
 	"github.com/kaliv0/homie/internal/storage"
 )
 
+const defaultLimit = 20
+
 var (
 	listHistoryCmd = &cobra.Command{
 		Use:   "history",
@@ -22,7 +24,11 @@ var (
 		Long: `List clipboard history
   Use <tab> to pin and select multiple entries`,
 		Run: func(cmd *cobra.Command, _ []string) {
-			output, err := fetchDisplayHistory(cfg)
+			limit, err := cmd.Flags().GetInt("limit")
+			if err != nil {
+				log.Logger().Fatalf("failed to get 'limit' flag: %v", err)
+			}
+			output, err := fetchDisplayHistory(limit)
 			if err != nil {
 				log.Logger().Fatal(err)
 			}
@@ -75,12 +81,12 @@ var (
 	}
 )
 
-func fetchDisplayHistory(cfg *config.Config) (string, error) {
+func fetchDisplayHistory(limit int) (string, error) {
 	dbPath, err := config.DBPath()
 	if err != nil {
 		return "", err
 	}
-	return finder.ListHistory(dbPath, cfg.Limit)
+	return finder.ListHistory(dbPath, limit)
 }
 
 func writeToClipboard(cfg *config.Config, text string) error {
@@ -111,9 +117,9 @@ func pasteText(text string) error {
 
 func init() {
 	listHistoryCmd.Flags().IntP(
-		config.KeyLimit,
+		"limit",
 		"l",
-		config.DefaultLimit,
+		defaultLimit,
 		"Limit the number of clipboard history items displayed",
 	)
 	listHistoryCmd.Flags().BoolP(
@@ -122,8 +128,6 @@ func init() {
 		false,
 		"Paste selected history item",
 	)
-
-	config.BindFlag(config.KeyLimit, listHistoryCmd.Flags().Lookup(config.KeyLimit))
 
 	rootCmd.AddCommand(listHistoryCmd)
 	rootCmd.AddCommand(clearHistoryCmd)

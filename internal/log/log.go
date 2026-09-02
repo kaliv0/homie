@@ -75,7 +75,7 @@ func swapLogFile(path string) {
 	logFile, logPath = f, path
 }
 
-// Verbose reports whether verbose diagnostics are enabled (from -v / .homierc).
+// Verbose reports whether verbose diagnostics are enabled (from .homierc).
 func Verbose() bool {
 	mu.RLock()
 	defer mu.RUnlock()

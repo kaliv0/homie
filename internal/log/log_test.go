@@ -9,8 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
 	"github.com/kaliv0/homie/internal/config"
@@ -29,31 +27,10 @@ func viperFromYAML(t *testing.T, yaml string) *viper.Viper {
 	return v
 }
 
-func mergeRootFlags(v *viper.Viper, flags *pflag.FlagSet) {
-	if flags.Changed(config.KeyVerbose) {
-		verbose, _ := flags.GetBool(config.KeyVerbose)
-		v.Set(config.KeyVerbose, verbose)
-	}
-	if flags.Changed(config.FlagLogFile) {
-		logFile, _ := flags.GetString(config.FlagLogFile)
-		v.Set(config.KeyLogFile, logFile)
-	}
-}
-
-// testCmdWithLogFlags returns a cobra command with the same logging flags as the homie CLI.
-func testCmdWithLogFlags() *cobra.Command {
-	cmd := &cobra.Command{Use: "test"}
-	cmd.Flags().BoolP(config.KeyVerbose, "v", false, "verbosity")
-	cmd.Flags().String(config.FlagLogFile, "", "log file")
-	return cmd
-}
-
-// configureLikeRoot mirrors cmd/root.go PersistentPreRunE logging setup.
-func configureLikeRoot(t *testing.T, cmd *cobra.Command, yaml string) {
+// configureFromConfig mirrors cmd/root.go PersistentPreRunE logging setup.
+func configureFromConfig(t *testing.T, yaml string) {
 	t.Helper()
-	v := viperFromYAML(t, yaml)
-	mergeRootFlags(v, cmd.Flags())
-	cfg, err := config.Parse(v)
+	cfg, err := config.Parse(viperFromYAML(t, yaml))
 	if err != nil {
 		t.Fatalf("Parse() failed: %v", err)
 	}
@@ -138,37 +115,21 @@ func TestConfigureSameLogPathReused(t *testing.T) {
 	}
 }
 
-func TestConfigureLikeRoot_UsesConfigWhenFlagNotSet(t *testing.T) {
+func TestConfigureFromConfig_UsesVerbose(t *testing.T) {
 	resetLog(t)
 
-	cmd := testCmdWithLogFlags()
-	configureLikeRoot(t, cmd, "verbose: true\n")
+	configureFromConfig(t, "verbose: true\n")
 	if !Verbose() {
 		t.Fatal("Verbose() = false, want true")
 	}
 }
 
-func TestConfigureLikeRoot_FlagOverridesConfig(t *testing.T) {
-	resetLog(t)
-
-	cmd := testCmdWithLogFlags()
-	if err := cmd.ParseFlags([]string{"-v"}); err != nil {
-		t.Fatal(err)
-	}
-
-	configureLikeRoot(t, cmd, "verbose: false\n")
-	if !Verbose() {
-		t.Fatal("Verbose() = false, want true")
-	}
-}
-
-func TestConfigureLikeRoot_ExpandsHomeInConfigLogFile(t *testing.T) {
+func TestConfigureFromConfig_ExpandsHomeInLogFile(t *testing.T) {
 	resetLog(t)
 	tmpDir := t.TempDir()
 	t.Setenv("HOME", tmpDir)
 
-	cmd := testCmdWithLogFlags()
-	configureLikeRoot(t, cmd, "verbose: true\nlog_file: ~/homie-configure-from-command.log\n")
+	configureFromConfig(t, "verbose: true\nlog_file: ~/homie-configure-from-command.log\n")
 	Logger().Printf("hello\n")
 
 	path := filepath.Join(tmpDir, "homie-configure-from-command.log")
@@ -184,46 +145,18 @@ func TestConfigureLikeRoot_ExpandsHomeInConfigLogFile(t *testing.T) {
 	}
 }
 
-func TestConfigureLikeRoot_TeeToFile(t *testing.T) {
-	tests := []struct {
-		name string
-		yaml string
-		args []string
-	}{
-		{
-			name: "from config",
-			yaml: "verbose: true\nlog_file: {{path}}\n",
-		},
-		{
-			name: "from flags override config",
-			yaml: "verbose: false\n",
-			args: []string{"-v", "--log-file"},
-		},
+func TestConfigureFromConfig_TeeToFile(t *testing.T) {
+	resetLog(t)
+	path := filepath.Join(t.TempDir(), "homie.log")
+
+	configureFromConfig(t, "verbose: true\nlog_file: "+path+"\n")
+	Logger().Printf("tee-line\n")
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			resetLog(t)
-			path := filepath.Join(t.TempDir(), "homie.log")
-
-			cmd := testCmdWithLogFlags()
-			yaml := strings.ReplaceAll(tt.yaml, "{{path}}", path)
-			if len(tt.args) > 0 {
-				if err := cmd.ParseFlags(append(tt.args, path)); err != nil {
-					t.Fatal(err)
-				}
-			}
-
-			configureLikeRoot(t, cmd, yaml)
-			Logger().Printf("tee-line\n")
-
-			data, err := os.ReadFile(path)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if !strings.Contains(string(data), "tee-line") {
-				t.Fatalf("expected tee line in file, got %q", string(data))
-			}
-		})
+	if !strings.Contains(string(data), "tee-line") {
+		t.Fatalf("expected tee line in file, got %q", string(data))
 	}
 }

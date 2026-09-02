@@ -52,45 +52,45 @@ func TestConfig_normalize(t *testing.T) {
 	}{
 		{
 			name:   "clamps negative values",
-			before: Config{Limit: -1, TTL: -7, MaxSize: -100},
-			want:   Config{Limit: DefaultLimit, TTL: 0, MaxSize: DefaultMaxSize},
+			before: Config{MinSize: -2, TTL: -7, MaxSize: -100},
+			want:   Config{MinSize: DefaultMinSize, TTL: 0, MaxSize: DefaultMaxSize},
 		},
 		{
-			name:   "clamps zero limit and max_size",
-			before: Config{Limit: 0, MaxSize: 0},
-			want:   Config{Limit: DefaultLimit, MaxSize: DefaultMaxSize},
+			name:   "clamps zero min_size and max_size",
+			before: Config{MinSize: 0, MaxSize: 0},
+			want:   Config{MinSize: DefaultMinSize, MaxSize: DefaultMaxSize},
 		},
 		{
 			name:   "keeps valid values",
-			before: Config{Limit: 15, TTL: 7, MaxSize: 300},
-			want:   Config{Limit: 15, TTL: 7, MaxSize: 300},
+			before: Config{MinSize: 12, TTL: 7, MaxSize: 300},
+			want:   Config{MinSize: 12, TTL: 7, MaxSize: 300},
 		},
 		{
 			name:       "no warn when not verbose",
-			before:     Config{Limit: -1, TTL: -1, MaxSize: -1},
-			want:       Config{Limit: DefaultLimit, TTL: 0, MaxSize: DefaultMaxSize},
+			before:     Config{MinSize: -1, TTL: -1, MaxSize: -1},
+			want:       Config{MinSize: DefaultMinSize, TTL: 0, MaxSize: DefaultMaxSize},
 			checkWarn:  true,
 			wantSilent: true,
 		},
 		{
 			name:       "no warn for zero values when verbose",
-			before:     Config{Limit: 0, MaxSize: 0, TTL: 0},
-			want:       Config{Limit: DefaultLimit, MaxSize: DefaultMaxSize, TTL: 0},
+			before:     Config{MinSize: 0, MaxSize: 0, TTL: 0},
+			want:       Config{MinSize: DefaultMinSize, MaxSize: DefaultMaxSize, TTL: 0},
 			verbose:    true,
 			checkWarn:  true,
 			wantSilent: true,
 		},
 		{
 			name:      "warns when verbose and negative",
-			before:    Config{Limit: -1, TTL: -2, MaxSize: -3},
-			want:      Config{Limit: DefaultLimit, TTL: 0, MaxSize: DefaultMaxSize},
+			before:    Config{MinSize: -2, TTL: -2, MaxSize: -3},
+			want:      Config{MinSize: DefaultMinSize, TTL: 0, MaxSize: DefaultMaxSize},
 			verbose:   true,
 			checkWarn: true,
 		},
 		{
 			name:      "clears unknown tool with warning",
-			before:    Config{Tool: "pbcopy", Limit: 15, MaxSize: 300},
-			want:      Config{Tool: "", Limit: 15, MaxSize: 300},
+			before:    Config{Tool: "pbcopy", MinSize: 10, MaxSize: 300},
+			want:      Config{Tool: "", MinSize: 10, MaxSize: 300},
 			checkWarn: true,
 		},
 	}
@@ -107,9 +107,9 @@ func TestConfig_normalize(t *testing.T) {
 				c.normalize()
 			}
 
-			if c.Limit != tt.want.Limit || c.TTL != tt.want.TTL || c.MaxSize != tt.want.MaxSize || c.Tool != tt.want.Tool {
-				t.Fatalf("after normalize: got Limit=%d TTL=%d MaxSize=%d Tool=%q, want Limit=%d TTL=%d MaxSize=%d Tool=%q",
-					c.Limit, c.TTL, c.MaxSize, c.Tool, tt.want.Limit, tt.want.TTL, tt.want.MaxSize, tt.want.Tool)
+			if c.MinSize != tt.want.MinSize || c.TTL != tt.want.TTL || c.MaxSize != tt.want.MaxSize || c.Tool != tt.want.Tool {
+				t.Fatalf("after normalize: got MinSize=%d TTL=%d MaxSize=%d Tool=%q, want MinSize=%d TTL=%d MaxSize=%d Tool=%q",
+					c.MinSize, c.TTL, c.MaxSize, c.Tool, tt.want.MinSize, tt.want.TTL, tt.want.MaxSize, tt.want.Tool)
 			}
 
 			if !tt.checkWarn {
@@ -131,7 +131,7 @@ func TestConfig_normalize(t *testing.T) {
 				}
 				return
 			}
-			for _, key := range []string{"limit", "ttl", "max_size"} {
+			for _, key := range []string{"min_size", "ttl", "max_size"} {
 				if !strings.Contains(joined, key) {
 					t.Errorf("expected warning mentioning %q, got %q", key, stderr)
 				}
@@ -145,16 +145,16 @@ func TestParse(t *testing.T) {
 	t.Setenv("HOME", tmpDir)
 
 	tests := []struct {
-		name       string
-		yaml       string
-		setup      func(*viper.Viper)
-		wantErr    string
-		check      func(t *testing.T, cfg *Config)
+		name    string
+		yaml    string
+		setup   func(*viper.Viper)
+		wantErr string
+		check   func(t *testing.T, cfg *Config)
 	}{
 		{
 			name: "defaults from empty viper",
 			check: func(t *testing.T, cfg *Config) {
-				if cfg.Limit != DefaultLimit || cfg.MaxSize != DefaultMaxSize || cfg.TTL != 0 {
+				if cfg.MinSize != DefaultMinSize || cfg.MaxSize != DefaultMaxSize || cfg.TTL != 0 {
 					t.Fatalf("unexpected defaults: %+v", cfg)
 				}
 				if cfg.Tool != "" {
@@ -164,18 +164,36 @@ func TestParse(t *testing.T) {
 		},
 		{
 			name: "valid config",
-			yaml: "limit: 10\nclean_up: true\nttl: 7\ntool: xclip\n",
+			yaml: "min_size: 15\nclean_up: true\nttl: 7\ntool: xclip\n",
 			check: func(t *testing.T, cfg *Config) {
-				if cfg.Limit != 10 || !cfg.CleanUp || cfg.TTL != 7 || cfg.Tool != ClipboardXclip {
+				if cfg.MinSize != 15 || !cfg.CleanUp || cfg.TTL != 7 || cfg.Tool != ClipboardXclip {
 					t.Fatalf("cfg = %+v, unexpected values", cfg)
 				}
 			},
 		},
 		{
-			name: "clamps negative values",
-			yaml: "limit: -1\nttl: -5\nmax_size: -10\n",
+			name: "ignores legacy limit key",
+			yaml: "limit: 99\nmin_size: 10\n",
 			check: func(t *testing.T, cfg *Config) {
-				if cfg.Limit != DefaultLimit || cfg.TTL != 0 || cfg.MaxSize != DefaultMaxSize {
+				if cfg.MinSize != 10 {
+					t.Fatalf("MinSize = %d, want 10 (limit key must not apply)", cfg.MinSize)
+				}
+			},
+		},
+		{
+			name: "legacy limit alone does not set min_size",
+			yaml: "limit: 99\n",
+			check: func(t *testing.T, cfg *Config) {
+				if cfg.MinSize != DefaultMinSize {
+					t.Fatalf("MinSize = %d, want default %d", cfg.MinSize, DefaultMinSize)
+				}
+			},
+		},
+		{
+			name: "clamps negative values",
+			yaml: "min_size: -2\nttl: -5\nmax_size: -10\n",
+			check: func(t *testing.T, cfg *Config) {
+				if cfg.MinSize != DefaultMinSize || cfg.TTL != 0 || cfg.MaxSize != DefaultMaxSize {
 					t.Fatalf("cfg = %+v, want clamped defaults", cfg)
 				}
 			},

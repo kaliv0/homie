@@ -16,16 +16,11 @@ const (
 	KeyVerbose        = "verbose"
 	KeyLogFile        = "log_file"
 	KeyPIDFile        = "pid_file"
-	KeyLimit          = "limit"
+	KeyMinSize        = "min_size"
 	KeyCleanUp        = "clean_up"
 	KeyTTL            = "ttl"
 	KeyMaxSize        = "max_size"
 	KeyTool = "tool"
-)
-
-// Cobra flag names only where they differ from Key*.
-const (
-	FlagLogFile = "log-file"
 )
 
 const (
@@ -53,7 +48,7 @@ func readConfig() error {
 	viper.SetDefault(KeyVerbose, false)
 	viper.SetDefault(KeyLogFile, "")
 	viper.SetDefault(KeyPIDFile, "")
-	viper.SetDefault(KeyLimit, DefaultLimit)
+	viper.SetDefault(KeyMinSize, DefaultMinSize)
 	viper.SetDefault(KeyCleanUp, false)
 	viper.SetDefault(KeyTTL, 0)
 	viper.SetDefault(KeyMaxSize, DefaultMaxSize)

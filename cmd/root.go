@@ -54,14 +54,6 @@ var rootCmd = &cobra.Command{
 		⠻⠿⢿⣿⣿⣿⣿⠏⠉⠉⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠢⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 `}
 
-func init() {
-	rootCmd.PersistentFlags().BoolP(config.KeyVerbose, "v", false, "enable verbose diagnostic messages")
-	rootCmd.PersistentFlags().String(config.FlagLogFile, "", "append logs to file")
-
-	config.BindFlag(config.KeyVerbose, rootCmd.PersistentFlags().Lookup(config.KeyVerbose))
-	config.BindFlag(config.KeyLogFile, rootCmd.PersistentFlags().Lookup(config.FlagLogFile))
-}
-
 // Execute runs the root cobra command.
 func Execute() error {
 	return rootCmd.Execute()

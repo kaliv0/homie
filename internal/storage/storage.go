@@ -225,7 +225,7 @@ type CleanupConfig struct {
 	CleanUp bool
 	TTL     int
 	MaxSize int
-	Limit   int
+	MinSize int
 }
 
 // CleanOldHistory trims clipboard history based on ttl or max_size settings.
@@ -244,8 +244,8 @@ func CleanOldHistory(db *Repository, cfg CleanupConfig) error {
 		return err
 	}
 
-	if total <= cfg.MaxSize || cfg.Limit >= total {
+	if total <= cfg.MaxSize || cfg.MinSize >= total {
 		return nil
 	}
-	return db.DeleteExcess(total - cfg.Limit)
+	return db.DeleteExcess(total - cfg.MinSize)
 }

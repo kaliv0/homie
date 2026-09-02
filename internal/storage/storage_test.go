@@ -478,7 +478,7 @@ func TestCleanOldHistory_TTLTakesPrecedenceOverMaxSize(t *testing.T) {
 	insertOldItem(t, repo, "old-0", "oldhash-prec0", 20)
 	insertOldItem(t, repo, "old-1", "oldhash-prec1", 20)
 	// TTL=7 removes only the 2 old items. max_size=5 would trim more but is ignored
-	cfg := CleanupConfig{CleanUp: true, TTL: 7, MaxSize: 5, Limit: 5}
+	cfg := CleanupConfig{CleanUp: true, TTL: 7, MaxSize: 5, MinSize: 5}
 
 	if err := CleanOldHistory(repo, cfg); err != nil {
 		t.Fatalf("CleanOldHistory() failed: %v", err)
@@ -492,16 +492,16 @@ func TestCleanOldHistory_MaxSize(t *testing.T) {
 		name      string
 		numItems  int
 		maxSize   int
-		limit     int
+		minSize   int
 		wantCount int
 		wantTexts []string // when set, verify surviving rows (newest-first)
 	}{
-		{"trims to limit", 10, 5, 5, 5, []string{"item-9", "item-8", "item-7", "item-6", "item-5"}},
-		{"under limit no-op", 3, 10, 5, 3, nil},
-		{"limit equals total", 10, 5, 10, 10, nil},
+		{"trims to min_size", 10, 5, 5, 5, []string{"item-9", "item-8", "item-7", "item-6", "item-5"}},
+		{"under min_size no-op", 3, 10, 5, 3, nil},
+		{"min_size equals total", 10, 5, 10, 10, nil},
 		{"max_size one item", 5, 1, 1, 1, nil},
 		{"no-op when total at or below max_size", 5, 10, 3, 5, nil},
-		{"no-op when min limit reaches total", 5, 3, 5, 5, nil},
+		{"no-op when min_size reaches total", 5, 3, 5, 5, nil},
 	}
 
 	for _, tt := range tests {
@@ -510,7 +510,7 @@ func TestCleanOldHistory_MaxSize(t *testing.T) {
 			repo := setupTestDB(t)
 			seedItems(t, repo, tt.numItems)
 
-			cfg := CleanupConfig{CleanUp: true, TTL: 0, MaxSize: tt.maxSize, Limit: tt.limit}
+			cfg := CleanupConfig{CleanUp: true, TTL: 0, MaxSize: tt.maxSize, MinSize: tt.minSize}
 			if err := CleanOldHistory(repo, cfg); err != nil {
 				t.Fatalf("CleanOldHistory() failed: %v", err)
 			}

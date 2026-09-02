@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"os/signal"
 	"syscall"
 
@@ -35,7 +34,7 @@ var (
 				}
 				return
 			}
-			runDaemon(cmd)
+			spawnDaemon(cmd)
 			if log.Verbose() {
 				log.Logger().Println("homie daemon started")
 			}
@@ -50,7 +49,7 @@ var (
 			if err := daemon.Stop(cfg); err != nil {
 				log.Logger().Fatal(err)
 			}
-			runDaemon(cmd)
+			spawnDaemon(cmd)
 			if log.Verbose() {
 				log.Logger().Println("homie daemon restarted")
 			}
@@ -60,68 +59,14 @@ var (
 	runCmd = &cobra.Command{
 		Use:    "run",
 		Hidden: true,
-		Run: func(cmd *cobra.Command, _ []string) {
-			lock, err := daemon.Acquire(cfg)
-			if err != nil {
+		Run: func(_ *cobra.Command, _ []string) {
+			if err := runProcess(cfg); err != nil {
 				if errors.Is(err, daemon.ErrAlreadyRunning) {
 					if log.Verbose() {
 						log.Logger().Println("homie daemon is already running")
 					}
 					os.Exit(1)
 				}
-				log.Logger().Fatal(err)
-			}
-			defer func() {
-				if releaseErr := lock.Release(); releaseErr != nil {
-					log.Logger().Println(releaseErr)
-				}
-			}()
-
-			dbPath, err := config.DBPath()
-			if err != nil {
-				log.Logger().Fatal(err)
-			}
-			db, err := storage.NewRepository(dbPath)
-			if err != nil {
-				log.Logger().Fatal(err)
-			}
-
-			defer func() {
-				if closeErr := db.Close(); closeErr != nil {
-					log.Logger().Println(closeErr)
-				}
-			}()
-
-			if err := db.AutoMigrate(); err != nil {
-				_ = db.Close()
-				log.Logger().Fatal(err)
-			}
-			if err := db.SetDBFilesPermissions(); err != nil {
-				_ = db.Close()
-				log.Logger().Fatal(err)
-			}
-
-			cleanup := storage.CleanupConfig{
-				CleanUp: cfg.CleanUp,
-				TTL:     cfg.TTL,
-				MaxSize: cfg.MaxSize,
-				MinSize: cfg.MinSize,
-			}
-			if err := storage.CleanOldHistory(db, cleanup); err != nil {
-				log.Logger().Println(err)
-			}
-
-			// Ignore SIGHUP so the daemon survives terminal/session closure (e.g. tmux exit)
-			signal.Ignore(syscall.SIGHUP)
-			ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-			defer stop()
-
-			if err := gclip.Init(); err != nil {
-				_ = db.Close()
-				log.Logger().Fatal(fmt.Errorf("failed to initialize clipboard: %w", err))
-			}
-			if err := clipboard.TrackClipboard(ctx, db, gclip.Watch(ctx, gclip.FmtText)); err != nil {
-				_ = db.Close()
 				log.Logger().Fatal(err)
 			}
 		},
@@ -159,16 +104,63 @@ var (
 	}
 )
 
-func runDaemon(cmd *cobra.Command) {
-	cmdName := cmd.Root().Name()
-	daemonCmd := exec.Command(cmdName, "run")
-	daemonCmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
-	if err := daemonCmd.Start(); err != nil {
-		log.Logger().Fatalf("failed to start daemon process (command=%q run): %v", cmdName, err)
+func spawnDaemon(cmd *cobra.Command) {
+	if err := daemon.Start(cfg, cmd.Root().Name(), "run"); err != nil {
+		log.Logger().Fatal(err)
 	}
-	if err := daemonCmd.Process.Release(); err != nil {
-		log.Logger().Printf("failed to release daemon process: %v\n", err)
+}
+
+func runProcess(cfg *config.Config) error {
+	lock, err := daemon.Acquire(cfg)
+	if err != nil {
+		return err
 	}
+	defer func() {
+		if releaseErr := lock.Release(); releaseErr != nil {
+			log.Logger().Println(releaseErr)
+		}
+	}()
+
+	dbPath, err := config.DBPath()
+	if err != nil {
+		return err
+	}
+	db, err := storage.NewRepository(dbPath)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if closeErr := db.Close(); closeErr != nil {
+			log.Logger().Println(closeErr)
+		}
+	}()
+
+	if err := db.AutoMigrate(); err != nil {
+		return err
+	}
+	if err := db.SetDBFilesPermissions(); err != nil {
+		return err
+	}
+
+	cleanup := storage.CleanupConfig{
+		CleanUp: cfg.CleanUp,
+		TTL:     cfg.TTL,
+		MaxSize: cfg.MaxSize,
+		MinSize: cfg.MinSize,
+	}
+	if err := storage.CleanOldHistory(db, cleanup); err != nil {
+		log.Logger().Println(err)
+	}
+
+	// Ignore SIGHUP so the daemon survives terminal/session closure (e.g. tmux exit)
+	signal.Ignore(syscall.SIGHUP)
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	if err := gclip.Init(); err != nil {
+		return fmt.Errorf("failed to initialize clipboard: %w", err)
+	}
+	return clipboard.TrackClipboard(ctx, db, gclip.Watch(ctx, gclip.FmtText))
 }
 
 func init() {

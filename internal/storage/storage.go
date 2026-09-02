@@ -17,7 +17,7 @@ import (
 const (
 	maxDbConnections = 2
 	connMaxTimespan  = 5 * time.Minute
-	dbBusyTimeout    = 5000 // 5s in milliseconds
+	dbBusyTimeout    = 5 * time.Second
 	journalMode      = "WAL"
 	dbSync           = "NORMAL"
 )
@@ -60,7 +60,7 @@ func NewRepository(dbPath string) (*Repository, error) {
 
 	// set SQLite pragmas
 	pragmas := []string{
-		fmt.Sprintf(`PRAGMA busy_timeout = %d`, dbBusyTimeout),
+		fmt.Sprintf(`PRAGMA busy_timeout = %d`, dbBusyTimeout.Milliseconds()),
 		fmt.Sprintf(`PRAGMA journal_mode = %s`, journalMode),
 		fmt.Sprintf(`PRAGMA synchronous = %s`, dbSync),
 	}
@@ -119,9 +119,9 @@ func (r *Repository) SetDBFilesPermissions() error {
 func (r *Repository) Read(offset, limit int) ([]ClipboardItem, error) {
 	var items []ClipboardItem
 	err := r.db.Select(&items, `
-		SELECT id, clip_text, text_hash, time_stamp 
-		FROM clipboard_items 
-		ORDER BY time_stamp DESC 
+		SELECT id, clip_text, text_hash, time_stamp
+		FROM clipboard_items
+		ORDER BY time_stamp DESC
 		LIMIT ? OFFSET ?
 	`, limit, offset)
 	if err != nil {
@@ -137,8 +137,8 @@ func (r *Repository) Write(item []byte) error {
 
 	var existingItem ClipboardItem
 	err := r.db.Get(&existingItem, `
-		SELECT id, clip_text, text_hash, time_stamp 
-		FROM clipboard_items 
+		SELECT id, clip_text, text_hash, time_stamp
+		FROM clipboard_items
 		WHERE text_hash = ?
 	`, textHash)
 
@@ -157,8 +157,8 @@ func (r *Repository) Write(item []byte) error {
 	}
 
 	_, err = r.db.Exec(`
-		UPDATE clipboard_items 
-		SET time_stamp = ? 
+		UPDATE clipboard_items
+		SET time_stamp = ?
 		WHERE id = ?
 	`, time.Now(), existingItem.ID)
 	if err != nil {
@@ -171,10 +171,10 @@ func (r *Repository) Write(item []byte) error {
 // DeleteExcess removes the oldest records.
 func (r *Repository) DeleteExcess(deleteCount int) error {
 	_, err := r.db.Exec(`
-		DELETE FROM clipboard_items 
+		DELETE FROM clipboard_items
 		WHERE id IN (
-			SELECT id FROM clipboard_items 
-			ORDER BY time_stamp 
+			SELECT id FROM clipboard_items
+			ORDER BY time_stamp
 			LIMIT ?
 		)
 	`, deleteCount)

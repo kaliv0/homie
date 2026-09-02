@@ -14,5 +14,4 @@ homie clear
 
 ### SEE ALSO
 
-* [homie](homie.md)	 - Terminal-based clipboard manager
-
+- [homie](homie.md) - Terminal-based clipboard manager

@@ -34,12 +34,12 @@ Related paths (not set in `.homierc`):
 Set `tool` to one of `xclip`, `xsel`, or `wl-clipboard` for `homie history` and tmux copy-pipe integration.
 Required on Linux when copying selected history back to the clipboard.
 
-When `clean_up: true`, entries older than `ttl` days are removed if `ttl > 0`; otherwise the oldest entries are trimmed when count exceeds `max_size`, keeping at most `min_size` rows.
+When `clean_up: true`, entries older than `ttl` days are removed if `ttl > 0` - otherwise the oldest entries are trimmed when count exceeds `max_size`, keeping at most `min_size` rows.
 
 Invalid values (`min_size` or `max_size` ≤ 0, negative `ttl`) are clamped at startup. Unknown `tool` is cleared with a warning. Malformed YAML fails at load.
 
 ### SEE ALSO
 
-* [homie](homie.md)	 - Terminal-based clipboard manager
-* [homie history](homie_history.md)	 - List clipboard history
-* [homie start](homie_start.md)	 - Start clipboard manager
+- [homie](homie.md) - Terminal-based clipboard manager
+- [homie history](homie_history.md) - List clipboard history
+- [homie start](homie_start.md) - Start clipboard manager

@@ -5,7 +5,7 @@ List clipboard history
 ### Synopsis
 
 List clipboard history
-  Use <tab> to pin and select multiple entries
+Use <tab> to pin and select multiple entries
 
 ```
 homie history [flags]
@@ -21,5 +21,4 @@ homie history [flags]
 
 ### SEE ALSO
 
-* [homie](homie.md)	 - Terminal-based clipboard manager
-
+- [homie](homie.md) - Terminal-based clipboard manager

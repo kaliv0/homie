@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-// ~/.homierc keys (via viper; not CLI flags).
+// ~/.homierc keys
 const (
 	Verbose = "verbose"
 	LogFile = "log_file"

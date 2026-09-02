@@ -20,7 +20,7 @@ If no daemon is running, stop is a no-op.
 
 ### SEE ALSO
 
-* [homie](homie.md)	 - Terminal-based clipboard manager
-* [homie start](homie_start.md)	 - Start clipboard manager
-* [homie restart](homie_restart.md)	 - Restart clipboard manager
-* [homie status](homie_status.md)	 - Show daemon status
+- [homie](homie.md) - Terminal-based clipboard manager
+- [homie start](homie_start.md) - Start clipboard manager
+- [homie restart](homie_restart.md) - Restart clipboard manager
+- [homie status](homie_status.md) - Show daemon status

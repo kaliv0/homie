@@ -22,7 +22,7 @@ The daemon coordinates via a pidfile (default `$XDG_RUNTIME_DIR/homie.pid`, with
 
 ### SEE ALSO
 
-* [homie](homie.md)	 - Terminal-based clipboard manager
-* [homie stop](homie_stop.md)	 - Stop clipboard manager
-* [homie restart](homie_restart.md)	 - Restart clipboard manager
-* [homie status](homie_status.md)	 - Show daemon status
+- [homie](homie.md) - Terminal-based clipboard manager
+- [homie stop](homie_stop.md) - Stop clipboard manager
+- [homie restart](homie_restart.md) - Restart clipboard manager
+- [homie status](homie_status.md) - Show daemon status

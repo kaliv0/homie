@@ -11,21 +11,16 @@ import (
 	"github.com/spf13/viper"
 )
 
-// Config file / viper keys (~/.homierc).
+// ~/.homierc keys
 const (
-	KeyVerbose        = "verbose"
-	KeyLogFile        = "log_file"
-	KeyPIDFile        = "pid_file"
-	KeyLimit          = "limit"
-	KeyCleanUp        = "clean_up"
-	KeyTTL            = "ttl"
-	KeyMaxSize        = "max_size"
-	KeyTool = "tool"
-)
-
-// Cobra flag names only where they differ from Key*.
-const (
-	FlagLogFile = "log-file"
+	Verbose = "verbose"
+	LogFile = "log_file"
+	PIDFile = "pid_file"
+	MinSize = "min_size"
+	CleanUp = "clean_up"
+	TTL     = "ttl"
+	MaxSize = "max_size"
+	Tool    = "tool"
 )
 
 const (
@@ -50,14 +45,14 @@ const (
 var ReadConfig = sync.OnceValue(readConfig)
 
 func readConfig() error {
-	viper.SetDefault(KeyVerbose, false)
-	viper.SetDefault(KeyLogFile, "")
-	viper.SetDefault(KeyPIDFile, "")
-	viper.SetDefault(KeyLimit, DefaultLimit)
-	viper.SetDefault(KeyCleanUp, false)
-	viper.SetDefault(KeyTTL, 0)
-	viper.SetDefault(KeyMaxSize, DefaultMaxSize)
-	viper.SetDefault(KeyTool, "")
+	viper.SetDefault(Verbose, false)
+	viper.SetDefault(LogFile, "")
+	viper.SetDefault(PIDFile, "")
+	viper.SetDefault(MinSize, DefaultMinSize)
+	viper.SetDefault(CleanUp, false)
+	viper.SetDefault(TTL, 0)
+	viper.SetDefault(MaxSize, DefaultMaxSize)
+	viper.SetDefault(Tool, "")
 
 	viper.SetConfigName(confFileName)
 	viper.SetConfigType(confFileType)
@@ -126,7 +121,6 @@ func (c *Config) resolvePIDFileDefault() {
 }
 
 func expandHomePath(p string) string {
-	p = strings.TrimSpace(p)
 	if p == "" || !strings.HasPrefix(p, homeDirPrefix) {
 		return p
 	}

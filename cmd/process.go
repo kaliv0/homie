@@ -105,7 +105,7 @@ var (
 				CleanUp: cfg.CleanUp,
 				TTL:     cfg.TTL,
 				MaxSize: cfg.MaxSize,
-				Limit:   cfg.Limit,
+				MinSize: cfg.MinSize,
 			}
 			if err := storage.CleanOldHistory(db, cleanup); err != nil {
 				log.Logger().Println(err)

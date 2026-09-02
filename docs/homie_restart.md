@@ -21,7 +21,7 @@ If no daemon was running, the stop step is a no-op and a new daemon is still sta
 
 ### SEE ALSO
 
-* [homie](homie.md)	 - Terminal-based clipboard manager
-* [homie start](homie_start.md)	 - Start clipboard manager
-* [homie stop](homie_stop.md)	 - Stop clipboard manager
-* [homie status](homie_status.md)	 - Show daemon status
+- [homie](homie.md) - Terminal-based clipboard manager
+- [homie start](homie_start.md) - Start clipboard manager
+- [homie stop](homie_stop.md) - Stop clipboard manager
+- [homie status](homie_status.md) - Show daemon status

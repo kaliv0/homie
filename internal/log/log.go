@@ -5,7 +5,6 @@ import (
 	"io"
 	"log"
 	"os"
-	"strings"
 	"sync"
 )
 
@@ -31,11 +30,10 @@ func init() {
 
 // Configure sets verbose diagnostics, an optional append-only log file (0o600), and tee (stderr + file).
 // Called only at process start.
-func Configure(verboseEnabled bool, filePath string) {
+func Configure(isVerbose bool, filePath string) {
 	mu.Lock()
 	defer mu.Unlock()
-	verbose = verboseEnabled
-	filePath = strings.TrimSpace(filePath)
+	verbose = isVerbose
 	if filePath != logPath {
 		swapLogFile(filePath)
 	}
@@ -75,7 +73,7 @@ func swapLogFile(path string) {
 	logFile, logPath = f, path
 }
 
-// Verbose reports whether verbose diagnostics are enabled (from -v / .homierc).
+// Verbose reports whether verbose diagnostics are enabled (from .homierc).
 func Verbose() bool {
 	mu.RLock()
 	defer mu.RUnlock()

@@ -3,14 +3,12 @@ package config
 import (
 	"fmt"
 	"os"
-	"strings"
 
-	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
 
 const (
-	DefaultLimit   = 20
+	DefaultMinSize = 20
 	DefaultMaxSize = 500
 )
 
@@ -26,7 +24,7 @@ type Config struct {
 	LogFile string
 	PIDFile string
 
-	Limit   int
+	MinSize int
 	CleanUp bool
 	TTL     int
 	MaxSize int
@@ -37,25 +35,17 @@ type Config struct {
 // Parse builds Config from a populated viper instance (after ReadConfig).
 func Parse(v *viper.Viper) (*Config, error) {
 	c := &Config{
-		Verbose: v.GetBool(KeyVerbose),
-		LogFile: v.GetString(KeyLogFile),
-		PIDFile: v.GetString(KeyPIDFile),
-		Limit:   v.GetInt(KeyLimit),
-		CleanUp: v.GetBool(KeyCleanUp),
-		TTL:     v.GetInt(KeyTTL),
-		MaxSize: v.GetInt(KeyMaxSize),
-		Tool:    strings.TrimSpace(v.GetString(KeyTool)),
+		Verbose: v.GetBool(Verbose),
+		LogFile: v.GetString(LogFile),
+		PIDFile: v.GetString(PIDFile),
+		MinSize: v.GetInt(MinSize),
+		CleanUp: v.GetBool(CleanUp),
+		TTL:     v.GetInt(TTL),
+		MaxSize: v.GetInt(MaxSize),
+		Tool:    v.GetString(Tool),
 	}
 	c.normalize()
 	return c, nil
-}
-
-// BindFlag binds a cobra/pflag flag to a viper key. Exits on failure.
-func BindFlag(key string, flag *pflag.Flag) {
-	if err := viper.BindPFlag(key, flag); err != nil {
-		fmt.Fprintf(os.Stderr, "homie: failed to bind %q flag to viper: %v\n", key, err)
-		os.Exit(1)
-	}
 }
 
 func (c *Config) normalize() {
@@ -80,11 +70,11 @@ func (c *Config) normalize() {
 		c.TTL = 0
 	}
 
-	if c.Limit < 0 {
-		warn("config: limit %d is negative, using %d\n", c.Limit, DefaultLimit)
-		c.Limit = DefaultLimit
-	} else if c.Limit == 0 {
-		c.Limit = DefaultLimit
+	if c.MinSize < 0 {
+		warn("config: min_size %d is negative, using %d\n", c.MinSize, DefaultMinSize)
+		c.MinSize = DefaultMinSize
+	} else if c.MinSize == 0 {
+		c.MinSize = DefaultMinSize
 	}
 
 	if c.MaxSize < 0 {

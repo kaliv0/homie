@@ -7,7 +7,7 @@ help:
 	@echo "  mod-verify   go mod verify"
 	@echo "  vet          go vet ./..."
 	@echo "  lint         golangci-lint via go run ($(GOLANGCI_VERSION))"
-	@echo "  staticcheck  staticcheck ./...        (via go run; no global install)"
+	@echo "  staticcheck  staticcheck ./..."
 	@echo "  build        go build -v ./..."
 	@echo "  test         go test ./..."
 	@echo "  test-race    go test -race ./..."

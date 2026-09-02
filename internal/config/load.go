@@ -24,9 +24,8 @@ type Config struct {
 	LogFile string
 	PIDFile string
 
-	MinSize int
-	CleanUp bool
 	TTL     int
+	MinSize int
 	MaxSize int
 
 	Tool string
@@ -38,9 +37,8 @@ func Parse(v *viper.Viper) (*Config, error) {
 		Verbose: v.GetBool(Verbose),
 		LogFile: v.GetString(LogFile),
 		PIDFile: v.GetString(PIDFile),
-		MinSize: v.GetInt(MinSize),
-		CleanUp: v.GetBool(CleanUp),
 		TTL:     v.GetInt(TTL),
+		MinSize: v.GetInt(MinSize),
 		MaxSize: v.GetInt(MaxSize),
 		Tool:    v.GetString(Tool),
 	}

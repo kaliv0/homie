@@ -164,9 +164,9 @@ func TestParse(t *testing.T) {
 		},
 		{
 			name: "valid config",
-			yaml: "min_size: 15\nclean_up: true\nttl: 7\ntool: xclip\n",
+			yaml: "min_size: 15\nttl: 7\ntool: xclip\n",
 			check: func(t *testing.T, cfg *Config) {
-				if cfg.MinSize != 15 || !cfg.CleanUp || cfg.TTL != 7 || cfg.Tool != ClipboardXclip {
+				if cfg.MinSize != 15 || cfg.TTL != 7 || cfg.Tool != ClipboardXclip {
 					t.Fatalf("cfg = %+v, unexpected values", cfg)
 				}
 			},

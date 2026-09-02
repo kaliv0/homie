@@ -444,18 +444,6 @@ func TestReset_ThenWrite(t *testing.T) {
 	}
 }
 
-func TestCleanOldHistory_Disabled(t *testing.T) {
-	t.Parallel()
-	repo := setupTestDB(t)
-	seedItems(t, repo, 3)
-
-	cfg := CleanupConfig{CleanUp: false}
-	if err := CleanOldHistory(repo, cfg); err != nil {
-		t.Fatalf("CleanOldHistory() failed: %v", err)
-	}
-	assertCount(t, repo, 3)
-}
-
 func TestCleanOldHistory_TTL(t *testing.T) {
 	t.Parallel()
 	repo := setupTestDB(t)
@@ -464,7 +452,7 @@ func TestCleanOldHistory_TTL(t *testing.T) {
 		t.Fatalf("Write() failed: %v", err)
 	}
 
-	cfg := CleanupConfig{CleanUp: true, TTL: 7}
+	cfg := CleanupConfig{TTL: 7}
 	if err := CleanOldHistory(repo, cfg); err != nil {
 		t.Fatalf("CleanOldHistory() failed: %v", err)
 	}
@@ -478,7 +466,7 @@ func TestCleanOldHistory_TTLTakesPrecedenceOverMaxSize(t *testing.T) {
 	insertOldItem(t, repo, "old-0", "oldhash-prec0", 20)
 	insertOldItem(t, repo, "old-1", "oldhash-prec1", 20)
 	// TTL=7 removes only the 2 old items. max_size=5 would trim more but is ignored
-	cfg := CleanupConfig{CleanUp: true, TTL: 7, MaxSize: 5, MinSize: 5}
+	cfg := CleanupConfig{TTL: 7, MaxSize: 5, MinSize: 5}
 
 	if err := CleanOldHistory(repo, cfg); err != nil {
 		t.Fatalf("CleanOldHistory() failed: %v", err)
@@ -510,7 +498,7 @@ func TestCleanOldHistory_MaxSize(t *testing.T) {
 			repo := setupTestDB(t)
 			seedItems(t, repo, tt.numItems)
 
-			cfg := CleanupConfig{CleanUp: true, TTL: 0, MaxSize: tt.maxSize, MinSize: tt.minSize}
+			cfg := CleanupConfig{TTL: 0, MaxSize: tt.maxSize, MinSize: tt.minSize}
 			if err := CleanOldHistory(repo, cfg); err != nil {
 				t.Fatalf("CleanOldHistory() failed: %v", err)
 			}

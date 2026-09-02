@@ -21,8 +21,7 @@ Related paths (not set in `.homierc`):
 ### Options
 
 ```
-  min_size   int     rows kept after size-based clean_up (default 20)
-  clean_up   bool    run history cleanup when the daemon starts (default false)
+  min_size   int     rows kept after size-based cleanup (default 20)
   ttl        int     keep history this many days; 0 disables ttl cleanup (default 0)
   max_size   int     max stored records for size-based cleanup (default 500)
   tool       string  clipboard tool for homie history on Linux (see below)
@@ -34,7 +33,7 @@ Related paths (not set in `.homierc`):
 Set `tool` to one of `xclip`, `xsel`, or `wl-clipboard` for `homie history` and tmux copy-pipe integration.
 Required on Linux when copying selected history back to the clipboard.
 
-When `clean_up: true`, entries older than `ttl` days are removed if `ttl > 0` - otherwise the oldest entries are trimmed when count exceeds `max_size`, keeping at most `min_size` rows.
+On daemon start, entries older than `ttl` days are removed if `ttl > 0` - otherwise the oldest entries are trimmed when count exceeds `max_size`, keeping at most `min_size` rows.
 
 Invalid values (`min_size` or `max_size` ≤ 0, negative `ttl`) are clamped at startup. Unknown `tool` is cleared with a warning. Malformed YAML fails at load.
 

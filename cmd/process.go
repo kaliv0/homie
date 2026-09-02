@@ -143,7 +143,6 @@ func runProcess(cfg *config.Config) error {
 	}
 
 	cleanup := storage.CleanupConfig{
-		CleanUp: cfg.CleanUp,
 		TTL:     cfg.TTL,
 		MaxSize: cfg.MaxSize,
 		MinSize: cfg.MinSize,

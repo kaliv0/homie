@@ -16,9 +16,8 @@ const (
 	Verbose = "verbose"
 	LogFile = "log_file"
 	PIDFile = "pid_file"
-	MinSize = "min_size"
-	CleanUp = "clean_up"
 	TTL     = "ttl"
+	MinSize = "min_size"
 	MaxSize = "max_size"
 	Tool    = "tool"
 )
@@ -48,9 +47,8 @@ func readConfig() error {
 	viper.SetDefault(Verbose, false)
 	viper.SetDefault(LogFile, "")
 	viper.SetDefault(PIDFile, "")
-	viper.SetDefault(MinSize, DefaultMinSize)
-	viper.SetDefault(CleanUp, false)
 	viper.SetDefault(TTL, 0)
+	viper.SetDefault(MinSize, DefaultMinSize)
 	viper.SetDefault(MaxSize, DefaultMaxSize)
 	viper.SetDefault(Tool, "")
 

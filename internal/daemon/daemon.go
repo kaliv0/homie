@@ -15,10 +15,10 @@ import (
 )
 
 const (
-	pidFileFlags   = os.O_CREATE | os.O_RDWR
-	pidFilePerm    = 0o600
-	pollInterval   = 100 * time.Millisecond
-	daemonWaitTime = 3 * time.Second
+	pidFileFlags  = os.O_CREATE | os.O_RDWR
+	pidFilePerm   = 0o600
+	pollInterval  = 100 * time.Millisecond
+	daemonTimeout = 3 * time.Second
 )
 
 // ErrAlreadyRunning is returned when another daemon holds the pidfile lock.
@@ -145,7 +145,7 @@ func waitUntilRunning(cfg *config.Config) error {
 }
 
 func waitForStatus(cfg *config.Config, wantRunning bool, action string) error {
-	deadline := time.Now().Add(daemonWaitTime)
+	deadline := time.Now().Add(daemonTimeout)
 	for time.Now().Before(deadline) {
 		running, _, err := Status(cfg)
 		if err != nil {
@@ -156,7 +156,7 @@ func waitForStatus(cfg *config.Config, wantRunning bool, action string) error {
 		}
 		time.Sleep(pollInterval)
 	}
-	return fmt.Errorf("timed out waiting for daemon to %s after %s", action, daemonWaitTime)
+	return fmt.Errorf("timed out waiting for daemon to %s after %s", action, daemonTimeout)
 }
 
 func readPID(path string) (int, error) {

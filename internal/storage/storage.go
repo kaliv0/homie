@@ -17,7 +17,7 @@ import (
 const (
 	maxDbConnections = 2
 	connMaxTimespan  = 5 * time.Minute
-	dbBusyTimeout    = 5 * time.Second
+	dbBusyTimeout    = 3 * time.Second
 	journalMode      = "WAL"
 	dbSync           = "NORMAL"
 )

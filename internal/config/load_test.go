@@ -51,12 +51,12 @@ func TestConfig_normalize(t *testing.T) {
 		wantSilent bool // when checkWarn, expect no stderr
 	}{
 		{
-			name:   "clamps negative values",
+			name:   "normalizes negative values",
 			before: Config{MinSize: -2, TTL: -7, MaxSize: -100},
 			want:   Config{MinSize: DefaultMinSize, TTL: 0, MaxSize: DefaultMaxSize},
 		},
 		{
-			name:   "clamps zero min_size and max_size",
+			name:   "normalizes zero min_size and max_size",
 			before: Config{MinSize: 0, MaxSize: 0},
 			want:   Config{MinSize: DefaultMinSize, MaxSize: DefaultMaxSize},
 		},
@@ -190,11 +190,11 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
-			name: "clamps negative values",
+			name: "normalizes negative values",
 			yaml: "min_size: -2\nttl: -5\nmax_size: -10\n",
 			check: func(t *testing.T, cfg *Config) {
 				if cfg.MinSize != DefaultMinSize || cfg.TTL != 0 || cfg.MaxSize != DefaultMaxSize {
-					t.Fatalf("cfg = %+v, want clamped defaults", cfg)
+					t.Fatalf("cfg = %+v, want normalized defaults", cfg)
 				}
 			},
 		},

@@ -35,7 +35,7 @@ Required on Linux when copying selected history back to the clipboard.
 
 On daemon start, entries older than `ttl` days are removed if `ttl > 0` - otherwise the oldest entries are trimmed when count exceeds `max_size`, keeping at most `min_size` rows.
 
-Invalid values (`min_size` or `max_size` ≤ 0, negative `ttl`) are clamped at startup. Unknown `tool` is cleared with a warning. Malformed YAML fails at load.
+Invalid values (`min_size` or `max_size` ≤ 0, negative `ttl`) are normalized at startup. Unknown `tool` is cleared with a warning. Malformed YAML fails at load.
 
 ### SEE ALSO
 

@@ -1,10 +1,12 @@
 package clipboard
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"runtime"
 	"strings"
+	"time"
 
 	gclip "golang.design/x/clipboard"
 
@@ -16,6 +18,9 @@ const (
 	binXsel   = "xsel"
 	binWLCopy = "wl-copy"
 )
+
+// writeTimeout bounds hung xclip/xsel/wl-copy writes.
+const writeTimeout = 3 * time.Second
 
 // WriteSelection writes text to the system clipboard.
 // On Linux, tool must be one of xclip, xsel, or wl-clipboard (from .homierc).
@@ -42,9 +47,15 @@ func writeExternal(text, tool string) error {
 		return fmt.Errorf("%s not found: %w", tool, err)
 	}
 
-	cmd := exec.Command(bin, args...)
+	ctx, cancel := context.WithTimeout(context.Background(), writeTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, bin, args...)
 	cmd.Stdin = strings.NewReader(text)
 	if err := cmd.Run(); err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return fmt.Errorf("clip command timed out after %s: %w", writeTimeout, err)
+		}
 		return fmt.Errorf("clip command failed during write: %w", err)
 	}
 	return nil

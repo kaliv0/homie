@@ -21,30 +21,27 @@ const (
 
 // Config holds resolved homie settings after load and normalize.
 type Config struct {
-	// TODO: check memory layout
-	Verbose bool
-	LogFile string
-	PIDFile string
-
+	LogFile   string
+	PIDFile   string
+	Tool      string
 	Limit     int
 	TTL       int
 	Keep      int
 	Threshold int
-
-	Tool string
+	Verbose   bool
 }
 
 // Parse builds Config from a populated viper instance (after ReadConfig).
 func Parse(v *viper.Viper) (*Config, error) {
 	c := &Config{
-		Verbose:   v.GetBool(Verbose),
 		LogFile:   v.GetString(LogFile),
 		PIDFile:   v.GetString(PIDFile),
+		Tool:      v.GetString(Tool),
 		Limit:     v.GetInt(Limit),
 		TTL:       v.GetInt(TTL),
 		Keep:      v.GetInt(Keep),
 		Threshold: v.GetInt(Threshold),
-		Tool:      v.GetString(Tool),
+		Verbose:   v.GetBool(Verbose),
 	}
 	c.normalize()
 	return c, nil

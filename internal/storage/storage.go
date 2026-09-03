@@ -223,8 +223,8 @@ func (r *Repository) Close() error {
 // CleanupConfig holds settings for history cleanup.
 type CleanupConfig struct {
 	TTL       int
-	Threshold int
 	Keep      int
+	Threshold int
 }
 
 // CleanOldHistory trims clipboard history based on ttl or threshold settings.

@@ -213,11 +213,7 @@ func TestParse(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			v := viperFromYAML(t, tt.yaml)
-			cfg, err := Parse(v)
-			if err != nil {
-				t.Fatalf("Parse() unexpected error: %v", err)
-			}
+			cfg := Parse(viperFromYAML(t, tt.yaml))
 			assertNormalized(t, *cfg, tt.want)
 		})
 	}
@@ -226,10 +222,7 @@ func TestParse(t *testing.T) {
 		v := viper.New()
 		applyHomieDefaults(v)
 		v.Set(LogFile, "~/homie.log")
-		cfg, err := Parse(v)
-		if err != nil {
-			t.Fatalf("Parse() unexpected error: %v", err)
-		}
+		cfg := Parse(v)
 		want := filepath.Join(tmpDir, "homie.log")
 		if cfg.LogFile != want {
 			t.Errorf("LogFile = %q, want %q", cfg.LogFile, want)
@@ -237,10 +230,7 @@ func TestParse(t *testing.T) {
 	})
 
 	t.Run("expands pid file path", func(t *testing.T) {
-		cfg, err := Parse(viperFromYAML(t, "pid_file: ~/state/homie.pid\n"))
-		if err != nil {
-			t.Fatalf("Parse() unexpected error: %v", err)
-		}
+		cfg := Parse(viperFromYAML(t, "pid_file: ~/state/homie.pid\n"))
 		want := filepath.Join(tmpDir, "state", "homie.pid")
 		if cfg.PIDFile != want {
 			t.Errorf("PIDFile = %q, want %q", cfg.PIDFile, want)
@@ -249,10 +239,7 @@ func TestParse(t *testing.T) {
 
 	t.Run("default pid file from XDG_RUNTIME_DIR", func(t *testing.T) {
 		t.Setenv("XDG_RUNTIME_DIR", filepath.Join(tmpDir, "runtime"))
-		cfg, err := Parse(viperFromYAML(t, ""))
-		if err != nil {
-			t.Fatalf("Parse() unexpected error: %v", err)
-		}
+		cfg := Parse(viperFromYAML(t, ""))
 		want := filepath.Join(tmpDir, "runtime", pidFileName)
 		if cfg.PIDFile != want {
 			t.Errorf("PIDFile = %q, want %q", cfg.PIDFile, want)
@@ -262,10 +249,7 @@ func TestParse(t *testing.T) {
 
 func TestPreparePIDFile_createsParentDir(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "nested", "homie.pid")
-	cfg, err := Parse(viperFromYAML(t, "pid_file: "+path+"\n"))
-	if err != nil {
-		t.Fatalf("Parse() unexpected error: %v", err)
-	}
+	cfg := Parse(viperFromYAML(t, "pid_file: "+path+"\n"))
 
 	if err := cfg.PreparePIDFile(); err != nil {
 		t.Fatalf("PreparePIDFile() failed: %v", err)

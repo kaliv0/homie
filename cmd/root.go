@@ -18,11 +18,7 @@ var rootCmd = &cobra.Command{
 			return err
 		}
 
-		var err error
-		cfg, err = config.Parse(viper.GetViper())
-		if err != nil {
-			return err
-		}
+		cfg = config.Parse(viper.GetViper())
 		log.Configure(cfg.Verbose, cfg.LogFile)
 		return nil
 	},

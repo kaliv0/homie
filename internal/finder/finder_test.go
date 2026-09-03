@@ -12,7 +12,6 @@ import (
 type mockReader struct {
 	pages     map[int][]storage.ClipboardItem
 	readErr   error
-	count     int
 	readCalls chan struct{}
 }
 
@@ -30,18 +29,17 @@ func (m *mockReader) Read(offset, _ int) ([]storage.ClipboardItem, error) {
 }
 
 func (m *mockReader) Count() (int, error) {
-	return m.count, nil
+	return 0, nil
 }
 
 func (m *mockReader) Close() error {
 	return nil
 }
 
-func newMockReader(pages map[int][]storage.ClipboardItem, readErr error, count int) *mockReader {
+func newMockReader(pages map[int][]storage.ClipboardItem, readErr error) *mockReader {
 	return &mockReader{
 		pages:     pages,
 		readErr:   readErr,
-		count:     count,
 		readCalls: make(chan struct{}, 64),
 	}
 }
@@ -101,7 +99,6 @@ func TestHandleLoadChannel_LoadsPages(t *testing.T) {
 			10: {{ID: 8, ClipText: "p3-1"}},
 		},
 		nil,
-		15,
 	)
 	f := newLoadChannelFixture(t, reader, []storage.ClipboardItem{{ID: 1, ClipText: "p1-1"}}, 0, 5, 15)
 
@@ -126,7 +123,7 @@ func TestHandleLoadChannel_LoadsPages(t *testing.T) {
 }
 
 func TestHandleLoadChannel_StopsAtTotal(t *testing.T) {
-	reader := newMockReader(map[int][]storage.ClipboardItem{}, nil, 5)
+	reader := newMockReader(map[int][]storage.ClipboardItem{}, nil)
 	f := newLoadChannelFixture(t, reader, nil, 5, 5, 5)
 
 	f.loadMore <- struct{}{}
@@ -134,7 +131,7 @@ func TestHandleLoadChannel_StopsAtTotal(t *testing.T) {
 }
 
 func TestHandleLoadChannel_ReadError(t *testing.T) {
-	reader := newMockReader(nil, errors.New("db error"), 100)
+	reader := newMockReader(nil, errors.New("db error"))
 	f := newLoadChannelFixture(t, reader, nil, 0, 5, 100)
 
 	f.loadMore <- struct{}{}
@@ -146,7 +143,7 @@ func TestHandleLoadChannel_ReadError(t *testing.T) {
 }
 
 func TestHandleLoadChannel_ChannelClose(t *testing.T) {
-	reader := newMockReader(nil, nil, 100)
+	reader := newMockReader(nil, nil)
 	s := &session{}
 	var wg sync.WaitGroup
 	loadMore := handleLoadChannel(s, reader, 0, 5, 100, &wg)
@@ -190,7 +187,7 @@ func TestHandleLoadChannel_Limits(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			reader := newMockReader(tt.pages, nil, tt.total)
+			reader := newMockReader(tt.pages, nil)
 			init := make([]storage.ClipboardItem, tt.initLen)
 			for i := range init {
 				init[i] = storage.ClipboardItem{ID: i + 1, ClipText: "init"}

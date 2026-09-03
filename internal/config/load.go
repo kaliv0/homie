@@ -34,7 +34,7 @@ type Config struct {
 }
 
 // Parse builds Config from a populated viper instance (after ReadConfig).
-func Parse(v *viper.Viper) (*Config, error) {
+func Parse(v *viper.Viper) *Config {
 	c := &Config{
 		LogFile:   v.GetString(LogFile),
 		PIDFile:   v.GetString(PIDFile),
@@ -46,7 +46,7 @@ func Parse(v *viper.Viper) (*Config, error) {
 		Verbose:   v.GetBool(Verbose),
 	}
 	c.normalize()
-	return c, nil
+	return c
 }
 
 func (c *Config) normalize() {

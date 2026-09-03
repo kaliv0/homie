@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
 	"github.com/kaliv0/homie/internal/clipboard"
 	"github.com/kaliv0/homie/internal/config"
@@ -22,12 +23,7 @@ var (
 		Long: `List clipboard history
   Use <tab> to pin and select multiple entries`,
 		Run: func(cmd *cobra.Command, _ []string) {
-			limit, err := parseLimit(cmd)
-			if err != nil {
-				log.Logger().Fatal(err)
-			}
-
-			output, err := fetchDisplayHistory(limit)
+			output, err := fetchDisplayHistory(cfg.Limit)
 			if err != nil {
 				log.Logger().Fatal(err)
 			}
@@ -80,17 +76,6 @@ var (
 	}
 )
 
-func parseLimit(cmd *cobra.Command) (int, error) {
-	if cmd.Flags().Changed("limit") {
-		limit, err := cmd.Flags().GetInt("limit")
-		if err != nil {
-			return 0, fmt.Errorf("failed to get 'limit' flag: %w", err)
-		}
-		return limit, nil
-	}
-	return cfg.Limit, nil
-}
-
 func fetchDisplayHistory(limit int) (string, error) {
 	dbPath, err := config.DBPath()
 	if err != nil {
@@ -141,4 +126,8 @@ func init() {
 
 	rootCmd.AddCommand(listHistoryCmd)
 	rootCmd.AddCommand(clearHistoryCmd)
+
+	if err := viper.BindPFlag("limit", listHistoryCmd.Flags().Lookup("limit")); err != nil {
+		log.Logger().Fatal(err)
+	}
 }

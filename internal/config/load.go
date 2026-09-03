@@ -21,6 +21,7 @@ const (
 
 // Config holds resolved homie settings after load and normalize.
 type Config struct {
+	// TODO: check memory layout
 	Verbose bool
 	LogFile string
 	PIDFile string

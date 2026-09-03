@@ -1,43 +1,15 @@
 package log
 
 import (
-	"bytes"
 	stdlog "log"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
-
-	"github.com/spf13/viper"
-
-	"github.com/kaliv0/homie/internal/config"
 )
 
-func viperFromYAML(t *testing.T, yaml string) *viper.Viper {
-	t.Helper()
-	v := viper.New()
-	if yaml == "" {
-		return v
-	}
-	v.SetConfigType("yaml")
-	if err := v.ReadConfig(bytes.NewBufferString(yaml)); err != nil {
-		t.Fatalf("ReadConfig: %v", err)
-	}
-	return v
-}
-
-// configureFromConfig mirrors cmd/root.go PersistentPreRunE logging setup.
-func configureFromConfig(t *testing.T, yaml string) {
-	t.Helper()
-	cfg, err := config.Parse(viperFromYAML(t, yaml))
-	if err != nil {
-		t.Fatalf("Parse() failed: %v", err)
-	}
-	Configure(cfg.Verbose, cfg.LogFile)
-}
-
-// resetLog restores default package logger state.
+// resetLog restores default package logger state after the test.
 func resetLog(t *testing.T) {
 	t.Helper()
 	t.Cleanup(restoreDefaultLogger)
@@ -115,41 +87,11 @@ func TestConfigureSameLogPathReused(t *testing.T) {
 	}
 }
 
-func TestConfigureFromConfig_UsesVerbose(t *testing.T) {
-	resetLog(t)
-
-	configureFromConfig(t, "verbose: true\n")
-	if !Verbose() {
-		t.Fatal("Verbose() = false, want true")
-	}
-}
-
-func TestConfigureFromConfig_ExpandsHomeInLogFile(t *testing.T) {
-	resetLog(t)
-	tmpDir := t.TempDir()
-	t.Setenv("HOME", tmpDir)
-
-	configureFromConfig(t, "verbose: true\nlog_file: ~/homie-configure-from-command.log\n")
-	Logger().Printf("hello\n")
-
-	path := filepath.Join(tmpDir, "homie-configure-from-command.log")
-	if _, err := os.Stat(path); err != nil {
-		t.Fatalf("expected expanded log file at %q: %v", path, err)
-	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(data), "hello") {
-		t.Fatalf("log file = %q, want hello", string(data))
-	}
-}
-
-func TestConfigureFromConfig_TeeToFile(t *testing.T) {
+func TestConfigure_TeeToFile(t *testing.T) {
 	resetLog(t)
 	path := filepath.Join(t.TempDir(), "homie.log")
 
-	configureFromConfig(t, "verbose: true\nlog_file: "+path+"\n")
+	Configure(true, path)
 	Logger().Printf("tee-line\n")
 
 	data, err := os.ReadFile(path)

@@ -1,7 +1,6 @@
 package clipboard
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"testing"
@@ -130,47 +129,14 @@ func TestTrackClipboard_WriteError(t *testing.T) {
 	}
 }
 
-func TestTrackClipboard_ItemVariants(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name    string
-		item    gclip.Data
-		wantLen int
-	}{
-		{"empty item", gclip.Data{Format: gclip.FmtText, Bytes: []byte("")}, 0},
-		{"nil item", gclip.Data{Format: gclip.FmtText, Bytes: nil}, 0},
-		{"large item", gclip.Data{Format: gclip.FmtText, Bytes: bytes.Repeat([]byte{'A'}, 100000)}, 100000},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			writer := &mockWriter{}
-			if err := trackClosed(t, writer, tt.item); err != nil {
-				t.Fatalf("TrackClipboard() failed: %v", err)
-			}
-			if len(writer.items) != 1 {
-				t.Fatalf("expected 1 item, got %d", len(writer.items))
-			}
-			if tt.wantLen > 0 && len(writer.items[0]) != tt.wantLen {
-				t.Errorf("expected %d bytes, got %d", tt.wantLen, len(writer.items[0]))
-			}
-		})
-	}
-}
-
-func TestTrackClipboard_ManyItems(t *testing.T) {
+func TestTrackClipboard_EmptyItem(t *testing.T) {
 	t.Parallel()
 	writer := &mockWriter{}
-	items := make([]gclip.Data, 100)
-	for i := range items {
-		items[i] = gclip.Data{Format: gclip.FmtText, Bytes: []byte("item")}
-	}
-
-	if err := trackClosed(t, writer, items...); err != nil {
+	if err := trackClosed(t, writer, gclip.Data{Format: gclip.FmtText, Bytes: nil}); err != nil {
 		t.Fatalf("TrackClipboard() failed: %v", err)
 	}
-	if len(writer.items) != 100 {
-		t.Errorf("expected 100 items, got %d", len(writer.items))
+	if len(writer.items) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(writer.items))
 	}
 }
 

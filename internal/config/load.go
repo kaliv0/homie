@@ -8,8 +8,9 @@ import (
 )
 
 const (
-	DefaultMinSize = 20
-	DefaultMaxSize = 500
+	DefaultLimit     = 20
+	DefaultKeep      = 20
+	DefaultThreshold = 500
 )
 
 const (
@@ -24,9 +25,10 @@ type Config struct {
 	LogFile string
 	PIDFile string
 
-	TTL     int
-	MinSize int
-	MaxSize int
+	Limit     int
+	TTL       int
+	Keep      int
+	Threshold int
 
 	Tool string
 }
@@ -34,13 +36,14 @@ type Config struct {
 // Parse builds Config from a populated viper instance (after ReadConfig).
 func Parse(v *viper.Viper) (*Config, error) {
 	c := &Config{
-		Verbose: v.GetBool(Verbose),
-		LogFile: v.GetString(LogFile),
-		PIDFile: v.GetString(PIDFile),
-		TTL:     v.GetInt(TTL),
-		MinSize: v.GetInt(MinSize),
-		MaxSize: v.GetInt(MaxSize),
-		Tool:    v.GetString(Tool),
+		Verbose:   v.GetBool(Verbose),
+		LogFile:   v.GetString(LogFile),
+		PIDFile:   v.GetString(PIDFile),
+		Limit:     v.GetInt(Limit),
+		TTL:       v.GetInt(TTL),
+		Keep:      v.GetInt(Keep),
+		Threshold: v.GetInt(Threshold),
+		Tool:      v.GetString(Tool),
 	}
 	c.normalize()
 	return c, nil
@@ -63,23 +66,24 @@ func (c *Config) normalize() {
 		}
 	}
 
+	if c.Limit < 0 {
+		warn("config: limit %d is negative, using %d\n", c.Limit, DefaultLimit)
+		c.Limit = DefaultLimit
+	}
+
 	if c.TTL < 0 {
 		warn("config: ttl %d is negative, using 0\n", c.TTL)
 		c.TTL = 0
 	}
 
-	if c.MinSize < 0 {
-		warn("config: min_size %d is negative, using %d\n", c.MinSize, DefaultMinSize)
-		c.MinSize = DefaultMinSize
-	} else if c.MinSize == 0 {
-		c.MinSize = DefaultMinSize
+	if c.Keep <= 0 {
+		warn("config: keep %d must positive, using %d\n", c.Keep, DefaultKeep)
+		c.Keep = DefaultKeep
 	}
 
-	if c.MaxSize < 0 {
-		warn("config: max_size %d is negative, using %d\n", c.MaxSize, DefaultMaxSize)
-		c.MaxSize = DefaultMaxSize
-	} else if c.MaxSize == 0 {
-		c.MaxSize = DefaultMaxSize
+	if c.Threshold <= 0 {
+		warn("config: threshold %d must positive, using %d\n", c.Threshold, DefaultThreshold)
+		c.Threshold = DefaultThreshold
 	}
 
 	c.resolvePaths()

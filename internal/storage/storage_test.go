@@ -459,14 +459,14 @@ func TestCleanOldHistory_TTL(t *testing.T) {
 	assertCount(t, repo, 1)
 }
 
-func TestCleanOldHistory_TTLTakesPrecedenceOverMaxSize(t *testing.T) {
+func TestCleanOldHistory_TTLTakesPrecedenceOverThreshold(t *testing.T) {
 	t.Parallel()
 	repo := setupTestDB(t)
 	seedItems(t, repo, 10)
 	insertOldItem(t, repo, "old-0", "oldhash-prec0", 20)
 	insertOldItem(t, repo, "old-1", "oldhash-prec1", 20)
-	// TTL=7 removes only the 2 old items. max_size=5 would trim more but is ignored
-	cfg := CleanupConfig{TTL: 7, MaxSize: 5, MinSize: 5}
+	// TTL=7 removes only the 2 old items. threshold=5 would trim more but is ignored
+	cfg := CleanupConfig{TTL: 7, Threshold: 5, Keep: 5}
 
 	if err := CleanOldHistory(repo, cfg); err != nil {
 		t.Fatalf("CleanOldHistory() failed: %v", err)
@@ -474,22 +474,22 @@ func TestCleanOldHistory_TTLTakesPrecedenceOverMaxSize(t *testing.T) {
 	assertCount(t, repo, 10)
 }
 
-func TestCleanOldHistory_MaxSize(t *testing.T) {
+func TestCleanOldHistory_Threshold(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name      string
 		numItems  int
-		maxSize   int
-		minSize   int
+		threshold int
+		keep      int
 		wantCount int
 		wantTexts []string // when set, verify surviving rows (newest-first)
 	}{
-		{"trims to min_size", 10, 5, 5, 5, []string{"item-9", "item-8", "item-7", "item-6", "item-5"}},
-		{"under min_size no-op", 3, 10, 5, 3, nil},
-		{"min_size equals total", 10, 5, 10, 10, nil},
-		{"max_size one item", 5, 1, 1, 1, nil},
-		{"no-op when total at or below max_size", 5, 10, 3, 5, nil},
-		{"no-op when min_size reaches total", 5, 3, 5, 5, nil},
+		{"trims to keep", 10, 5, 5, 5, []string{"item-9", "item-8", "item-7", "item-6", "item-5"}},
+		{"under keep no-op", 3, 10, 5, 3, nil},
+		{"keep equals total", 10, 5, 10, 10, nil},
+		{"threshold one item", 5, 1, 1, 1, nil},
+		{"no-op when total at or below threshold", 5, 10, 3, 5, nil},
+		{"no-op when keep reaches total", 5, 3, 5, 5, nil},
 	}
 
 	for _, tt := range tests {
@@ -498,7 +498,7 @@ func TestCleanOldHistory_MaxSize(t *testing.T) {
 			repo := setupTestDB(t)
 			seedItems(t, repo, tt.numItems)
 
-			cfg := CleanupConfig{TTL: 0, MaxSize: tt.maxSize, MinSize: tt.minSize}
+			cfg := CleanupConfig{TTL: 0, Threshold: tt.threshold, Keep: tt.keep}
 			if err := CleanOldHistory(repo, cfg); err != nil {
 				t.Fatalf("CleanOldHistory() failed: %v", err)
 			}

@@ -1,6 +1,7 @@
+limit: 20                            # number of retrieved history items per page
 ttl: 7                               # retention period in days
-#min_size: 20                        # minimum rows kept after size-based cleanup
-#max_size: 500                       # maximum amount of stored records
+#keep: 20                            # rows kept after size-based cleanup
+#threshold: 500                      # cleanup triggers when stored records exceed this
 tool: xclip                          # xclip, xsel, or wl-clipboard (clipboard text management on linux)
 #verbose: true                       # diagnostic messages to stderr (and log file when teeing)
 #log_file: ~/.local/state/homie.log  # append logs here (file permissions -> 0o600)

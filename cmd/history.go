@@ -15,8 +15,6 @@ import (
 	"github.com/kaliv0/homie/internal/storage"
 )
 
-const defaultLimit = 20
-
 var (
 	listHistoryCmd = &cobra.Command{
 		Use:   "history",
@@ -24,10 +22,11 @@ var (
 		Long: `List clipboard history
   Use <tab> to pin and select multiple entries`,
 		Run: func(cmd *cobra.Command, _ []string) {
-			limit, err := cmd.Flags().GetInt("limit")
+			limit, err := parseLimit(cmd)
 			if err != nil {
-				log.Logger().Fatalf("failed to get 'limit' flag: %v", err)
+				log.Logger().Fatal(err)
 			}
+
 			output, err := fetchDisplayHistory(limit)
 			if err != nil {
 				log.Logger().Fatal(err)
@@ -81,6 +80,17 @@ var (
 	}
 )
 
+func parseLimit(cmd *cobra.Command) (int, error) {
+	if cmd.Flags().Changed("limit") {
+		limit, err := cmd.Flags().GetInt("limit")
+		if err != nil {
+			return 0, fmt.Errorf("failed to get 'limit' flag: %w", err)
+		}
+		return limit, nil
+	}
+	return cfg.Limit, nil
+}
+
 func fetchDisplayHistory(limit int) (string, error) {
 	dbPath, err := config.DBPath()
 	if err != nil {
@@ -119,7 +129,7 @@ func init() {
 	listHistoryCmd.Flags().IntP(
 		"limit",
 		"l",
-		defaultLimit,
+		config.DefaultLimit,
 		"Limit the number of clipboard history items displayed",
 	)
 	listHistoryCmd.Flags().BoolP(

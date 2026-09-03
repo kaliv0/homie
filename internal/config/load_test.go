@@ -11,9 +11,21 @@ import (
 	"github.com/spf13/viper"
 )
 
+func applyHomieDefaults(v *viper.Viper) {
+	v.SetDefault(Verbose, false)
+	v.SetDefault(LogFile, "")
+	v.SetDefault(PIDFile, "")
+	v.SetDefault(Limit, DefaultLimit)
+	v.SetDefault(TTL, 0)
+	v.SetDefault(Keep, DefaultKeep)
+	v.SetDefault(Threshold, DefaultThreshold)
+	v.SetDefault(Tool, "")
+}
+
 func viperFromYAML(t *testing.T, yaml string) *viper.Viper {
 	t.Helper()
 	v := viper.New()
+	applyHomieDefaults(v)
 	if yaml == "" {
 		return v
 	}
@@ -52,45 +64,50 @@ func TestConfig_normalize(t *testing.T) {
 	}{
 		{
 			name:   "normalizes negative values",
-			before: Config{MinSize: -2, TTL: -7, MaxSize: -100},
-			want:   Config{MinSize: DefaultMinSize, TTL: 0, MaxSize: DefaultMaxSize},
+			before: Config{Keep: -2, TTL: -7, Threshold: -100, Limit: -4},
+			want:   Config{Keep: DefaultKeep, TTL: 0, Threshold: DefaultThreshold, Limit: DefaultLimit},
 		},
 		{
-			name:   "normalizes zero min_size and max_size",
-			before: Config{MinSize: 0, MaxSize: 0},
-			want:   Config{MinSize: DefaultMinSize, MaxSize: DefaultMaxSize},
+			name:   "normalizes zero keep and threshold",
+			before: Config{Keep: 0, Threshold: 0, Limit: 0},
+			want:   Config{Keep: DefaultKeep, Threshold: DefaultThreshold, Limit: 0},
+		},
+		{
+			name:   "keeps zero limit",
+			before: Config{Keep: DefaultKeep, Threshold: DefaultThreshold, Limit: 0},
+			want:   Config{Keep: DefaultKeep, Threshold: DefaultThreshold, Limit: 0},
 		},
 		{
 			name:   "keeps valid values",
-			before: Config{MinSize: 12, TTL: 7, MaxSize: 300},
-			want:   Config{MinSize: 12, TTL: 7, MaxSize: 300},
+			before: Config{Keep: 12, TTL: 7, Threshold: 300, Limit: 8},
+			want:   Config{Keep: 12, TTL: 7, Threshold: 300, Limit: 8},
 		},
 		{
 			name:       "no warn when not verbose",
-			before:     Config{MinSize: -1, TTL: -1, MaxSize: -1},
-			want:       Config{MinSize: DefaultMinSize, TTL: 0, MaxSize: DefaultMaxSize},
+			before:     Config{Keep: -1, TTL: -1, Threshold: -1, Limit: -1},
+			want:       Config{Keep: DefaultKeep, TTL: 0, Threshold: DefaultThreshold, Limit: DefaultLimit},
 			checkWarn:  true,
 			wantSilent: true,
 		},
 		{
-			name:       "no warn for zero values when verbose",
-			before:     Config{MinSize: 0, MaxSize: 0, TTL: 0},
-			want:       Config{MinSize: DefaultMinSize, MaxSize: DefaultMaxSize, TTL: 0},
+			name:       "no warn for zero ttl when verbose",
+			before:     Config{Keep: DefaultKeep, Threshold: DefaultThreshold, TTL: 0, Limit: DefaultLimit},
+			want:       Config{Keep: DefaultKeep, Threshold: DefaultThreshold, TTL: 0, Limit: DefaultLimit},
 			verbose:    true,
 			checkWarn:  true,
 			wantSilent: true,
 		},
 		{
 			name:      "warns when verbose and negative",
-			before:    Config{MinSize: -2, TTL: -2, MaxSize: -3},
-			want:      Config{MinSize: DefaultMinSize, TTL: 0, MaxSize: DefaultMaxSize},
+			before:    Config{Keep: -2, TTL: -2, Threshold: -3, Limit: -4},
+			want:      Config{Keep: DefaultKeep, TTL: 0, Threshold: DefaultThreshold, Limit: DefaultLimit},
 			verbose:   true,
 			checkWarn: true,
 		},
 		{
 			name:      "clears unknown tool with warning",
-			before:    Config{Tool: "pbcopy", MinSize: 10, MaxSize: 300},
-			want:      Config{Tool: "", MinSize: 10, MaxSize: 300},
+			before:    Config{Tool: "pbcopy", Keep: 10, Threshold: 300, Limit: DefaultLimit},
+			want:      Config{Tool: "", Keep: 10, Threshold: 300, Limit: DefaultLimit},
 			checkWarn: true,
 		},
 	}
@@ -107,9 +124,9 @@ func TestConfig_normalize(t *testing.T) {
 				c.normalize()
 			}
 
-			if c.MinSize != tt.want.MinSize || c.TTL != tt.want.TTL || c.MaxSize != tt.want.MaxSize || c.Tool != tt.want.Tool {
-				t.Fatalf("after normalize: got MinSize=%d TTL=%d MaxSize=%d Tool=%q, want MinSize=%d TTL=%d MaxSize=%d Tool=%q",
-					c.MinSize, c.TTL, c.MaxSize, c.Tool, tt.want.MinSize, tt.want.TTL, tt.want.MaxSize, tt.want.Tool)
+			if c.Keep != tt.want.Keep || c.TTL != tt.want.TTL || c.Threshold != tt.want.Threshold || c.Limit != tt.want.Limit || c.Tool != tt.want.Tool {
+				t.Fatalf("after normalize: got Keep=%d TTL=%d Threshold=%d Limit=%d Tool=%q, want Keep=%d TTL=%d Threshold=%d Limit=%d Tool=%q",
+					c.Keep, c.TTL, c.Threshold, c.Limit, c.Tool, tt.want.Keep, tt.want.TTL, tt.want.Threshold, tt.want.Limit, tt.want.Tool)
 			}
 
 			if !tt.checkWarn {
@@ -131,7 +148,7 @@ func TestConfig_normalize(t *testing.T) {
 				}
 				return
 			}
-			for _, key := range []string{"min_size", "ttl", "max_size"} {
+			for _, key := range []string{"keep", "ttl", "threshold", "limit"} {
 				if !strings.Contains(joined, key) {
 					t.Errorf("expected warning mentioning %q, got %q", key, stderr)
 				}
@@ -154,7 +171,7 @@ func TestParse(t *testing.T) {
 		{
 			name: "defaults from empty viper",
 			check: func(t *testing.T, cfg *Config) {
-				if cfg.MinSize != DefaultMinSize || cfg.MaxSize != DefaultMaxSize || cfg.TTL != 0 {
+				if cfg.Keep != DefaultKeep || cfg.Threshold != DefaultThreshold || cfg.TTL != 0 || cfg.Limit != DefaultLimit {
 					t.Fatalf("unexpected defaults: %+v", cfg)
 				}
 				if cfg.Tool != "" {
@@ -164,36 +181,51 @@ func TestParse(t *testing.T) {
 		},
 		{
 			name: "valid config",
-			yaml: "min_size: 15\nttl: 7\ntool: xclip\n",
+			yaml: "keep: 15\nttl: 7\nlimit: 8\ntool: xclip\n",
 			check: func(t *testing.T, cfg *Config) {
-				if cfg.MinSize != 15 || cfg.TTL != 7 || cfg.Tool != ClipboardXclip {
+				if cfg.Keep != 15 || cfg.TTL != 7 || cfg.Limit != 8 || cfg.Tool != ClipboardXclip {
 					t.Fatalf("cfg = %+v, unexpected values", cfg)
 				}
 			},
 		},
 		{
-			name: "ignores legacy limit key",
-			yaml: "limit: 99\nmin_size: 10\n",
+			name: "limit does not set keep",
+			yaml: "limit: 99\nkeep: 10\n",
 			check: func(t *testing.T, cfg *Config) {
-				if cfg.MinSize != 10 {
-					t.Fatalf("MinSize = %d, want 10 (limit key must not apply)", cfg.MinSize)
+				if cfg.Keep != 10 {
+					t.Fatalf("Keep = %d, want 10", cfg.Keep)
+				}
+				if cfg.Limit != 99 {
+					t.Fatalf("Limit = %d, want 99", cfg.Limit)
 				}
 			},
 		},
 		{
-			name: "legacy limit alone does not set min_size",
+			name: "limit alone does not set keep",
 			yaml: "limit: 99\n",
 			check: func(t *testing.T, cfg *Config) {
-				if cfg.MinSize != DefaultMinSize {
-					t.Fatalf("MinSize = %d, want default %d", cfg.MinSize, DefaultMinSize)
+				if cfg.Keep != DefaultKeep {
+					t.Fatalf("Keep = %d, want default %d", cfg.Keep, DefaultKeep)
+				}
+				if cfg.Limit != 99 {
+					t.Fatalf("Limit = %d, want 99", cfg.Limit)
+				}
+			},
+		},
+		{
+			name: "preserves explicit zero limit",
+			yaml: "limit: 0\n",
+			check: func(t *testing.T, cfg *Config) {
+				if cfg.Limit != 0 {
+					t.Fatalf("Limit = %d, want 0", cfg.Limit)
 				}
 			},
 		},
 		{
 			name: "normalizes negative values",
-			yaml: "min_size: -2\nttl: -5\nmax_size: -10\n",
+			yaml: "keep: -2\nttl: -5\nthreshold: -10\nlimit: -3\n",
 			check: func(t *testing.T, cfg *Config) {
-				if cfg.MinSize != DefaultMinSize || cfg.TTL != 0 || cfg.MaxSize != DefaultMaxSize {
+				if cfg.Keep != DefaultKeep || cfg.TTL != 0 || cfg.Threshold != DefaultThreshold || cfg.Limit != DefaultLimit {
 					t.Fatalf("cfg = %+v, want normalized defaults", cfg)
 				}
 			},
@@ -266,6 +298,7 @@ func TestParse(t *testing.T) {
 			var v *viper.Viper
 			if tt.setup != nil {
 				v = viper.New()
+				applyHomieDefaults(v)
 				tt.setup(v)
 			} else {
 				v = viperFromYAML(t, tt.yaml)

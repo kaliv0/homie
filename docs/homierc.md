@@ -5,7 +5,7 @@ Optional YAML configuration for homie.
 ### Synopsis
 
 Place the file at `~/.homierc`. A missing file is fine — defaults are used.
-History pagination uses CLI flags only (`homie history --limit`, `--paste`).
+`homie history --limit` overrides `limit` from this file. `--paste` is CLI-only.
 
 Example: [examples/.homierc](../examples/.homierc)
 
@@ -21,9 +21,10 @@ Related paths (not set in `.homierc`):
 ### Options
 
 ```
-  min_size   int     rows kept after size-based cleanup (default 20)
+  limit      int     history items loaded per page (default 20; 0 is allowed)
+  keep       int     rows kept after size-based cleanup (default 20)
   ttl        int     keep history this many days; 0 disables ttl cleanup (default 0)
-  max_size   int     max stored records for size-based cleanup (default 500)
+  threshold  int     max stored records for size-based cleanup (default 500)
   tool       string  clipboard tool for homie history on Linux (see below)
   pid_file   string  daemon pidfile path; supports ~ (default: XDG runtime dir)
   verbose    bool    diagnostic messages (default false)
@@ -33,9 +34,9 @@ Related paths (not set in `.homierc`):
 Set `tool` to one of `xclip`, `xsel`, or `wl-clipboard` for `homie history` and tmux copy-pipe integration.
 Required on Linux when copying selected history back to the clipboard.
 
-On daemon start, entries older than `ttl` days are removed if `ttl > 0` - otherwise the oldest entries are trimmed when count exceeds `max_size`, keeping at most `min_size` rows.
+On daemon start, entries older than `ttl` days are removed if `ttl > 0` - otherwise the oldest entries are trimmed when count exceeds `threshold`, preserving at most `keep` rows.
 
-Invalid values (`min_size` or `max_size` ≤ 0, negative `ttl`) are normalized at startup. Unknown `tool` is cleared with a warning. Malformed YAML fails at load.
+Invalid values (`keep` or `threshold` ≤ 0, negative `ttl` or `limit`) are normalized at startup. Unknown `tool` is cleared with a warning. Malformed YAML fails at load.
 
 ### SEE ALSO
 

@@ -143,9 +143,9 @@ func runProcess(cfg *config.Config) error {
 	}
 
 	cleanup := storage.CleanupConfig{
-		TTL:     cfg.TTL,
-		MaxSize: cfg.MaxSize,
-		MinSize: cfg.MinSize,
+		TTL:       cfg.TTL,
+		Threshold: cfg.Threshold,
+		Keep:      cfg.Keep,
 	}
 	if err := storage.CleanOldHistory(db, cleanup); err != nil {
 		log.Logger().Println(err)

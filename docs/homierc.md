@@ -21,14 +21,14 @@ Related paths (not set in `.homierc`):
 ### Options
 
 ```
-  limit      int     history items loaded per page (default 20; 0 is allowed)
+  limit      int     history items loaded per page (default 20)
   keep       int     rows kept after size-based cleanup (default 20)
   ttl        int     keep history this many days; 0 disables ttl cleanup (default 0)
   threshold  int     max stored records for size-based cleanup (default 500)
   tool       string  clipboard tool for homie history on Linux (see below)
   pid_file   string  daemon pidfile path; supports ~ (default: XDG runtime dir)
-  verbose    bool    diagnostic messages (default false)
   log_file   string  append logs here, mode 0600 (default "")
+  verbose    bool    diagnostic messages (default false)
 ```
 
 Set `tool` to one of `xclip`, `xsel`, or `wl-clipboard` for `homie history` and tmux copy-pipe integration.
@@ -36,7 +36,7 @@ Required on Linux when copying selected history back to the clipboard.
 
 On daemon start, entries older than `ttl` days are removed if `ttl > 0` - otherwise the oldest entries are trimmed when count exceeds `threshold`, preserving at most `keep` rows.
 
-Invalid values (`keep` or `threshold` ≤ 0, negative `ttl` or `limit`) are normalized at startup. Unknown `tool` is cleared with a warning. Malformed YAML fails at load.
+Negative `keep`, `threshold`, `ttl`, or `limit` are normalized at startup. Unknown `tool` is cleared with a warning. Malformed YAML fails at load.
 
 ### SEE ALSO
 

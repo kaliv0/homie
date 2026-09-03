@@ -16,7 +16,7 @@ func applyHomieDefaults(v *viper.Viper) {
 	v.SetDefault(LogFile, "")
 	v.SetDefault(PIDFile, "")
 	v.SetDefault(Limit, DefaultLimit)
-	v.SetDefault(TTL, 0)
+	v.SetDefault(TTL, DefaultTTL)
 	v.SetDefault(Keep, DefaultKeep)
 	v.SetDefault(Threshold, DefaultThreshold)
 	v.SetDefault(Tool, "")
@@ -68,9 +68,9 @@ func TestConfig_normalize(t *testing.T) {
 			want:   Config{Keep: DefaultKeep, TTL: 0, Threshold: DefaultThreshold, Limit: DefaultLimit},
 		},
 		{
-			name:   "normalizes zero keep and threshold",
+			name:   "keeps zero keep and threshold",
 			before: Config{Keep: 0, Threshold: 0, Limit: 0},
-			want:   Config{Keep: DefaultKeep, Threshold: DefaultThreshold, Limit: 0},
+			want:   Config{Keep: 0, Threshold: 0, Limit: 0},
 		},
 		{
 			name:   "keeps zero limit",
@@ -218,6 +218,39 @@ func TestParse(t *testing.T) {
 			check: func(t *testing.T, cfg *Config) {
 				if cfg.Limit != 0 {
 					t.Fatalf("Limit = %d, want 0", cfg.Limit)
+				}
+			},
+		},
+		{
+			name: "preserves explicit zero keep and threshold",
+			yaml: "keep: 0\nthreshold: 0\n",
+			check: func(t *testing.T, cfg *Config) {
+				if cfg.Keep != 0 || cfg.Threshold != 0 {
+					t.Fatalf("cfg = %+v, want Keep=0 Threshold=0", cfg)
+				}
+			},
+		},
+		{
+			name: "preserves explicit zero keep only",
+			yaml: "keep: 0\n",
+			check: func(t *testing.T, cfg *Config) {
+				if cfg.Keep != 0 {
+					t.Fatalf("Keep = %d, want 0", cfg.Keep)
+				}
+				if cfg.Threshold != DefaultThreshold {
+					t.Fatalf("Threshold = %d, want default %d", cfg.Threshold, DefaultThreshold)
+				}
+			},
+		},
+		{
+			name: "preserves explicit zero threshold only",
+			yaml: "threshold: 0\n",
+			check: func(t *testing.T, cfg *Config) {
+				if cfg.Threshold != 0 {
+					t.Fatalf("Threshold = %d, want 0", cfg.Threshold)
+				}
+				if cfg.Keep != DefaultKeep {
+					t.Fatalf("Keep = %d, want default %d", cfg.Keep, DefaultKeep)
 				}
 			},
 		},

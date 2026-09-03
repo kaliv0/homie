@@ -8,7 +8,9 @@ import (
 )
 
 const (
-	DefaultLimit     = 20
+	DefaultLimit = 20
+
+	DefaultTTL       = 0
 	DefaultKeep      = 20
 	DefaultThreshold = 500
 )
@@ -64,24 +66,20 @@ func (c *Config) normalize() {
 		}
 	}
 
-	if c.Limit < 0 {
-		warn("config: limit %d is negative, using %d\n", c.Limit, DefaultLimit)
-		c.Limit = DefaultLimit
-	}
-
-	if c.TTL < 0 {
-		warn("config: ttl %d is negative, using 0\n", c.TTL)
-		c.TTL = 0
-	}
-
-	if c.Keep <= 0 {
-		warn("config: keep %d must positive, using %d\n", c.Keep, DefaultKeep)
-		c.Keep = DefaultKeep
-	}
-
-	if c.Threshold <= 0 {
-		warn("config: threshold %d must positive, using %d\n", c.Threshold, DefaultThreshold)
-		c.Threshold = DefaultThreshold
+	for _, n := range []struct {
+		name string
+		val  *int
+		def  int
+	}{
+		{Limit, &c.Limit, DefaultLimit},
+		{TTL, &c.TTL, DefaultTTL},
+		{Keep, &c.Keep, DefaultKeep},
+		{Threshold, &c.Threshold, DefaultThreshold},
+	} {
+		if *n.val < 0 {
+			warn("config: %s %d is negative, using %d\n", n.name, *n.val, n.def)
+			*n.val = n.def
+		}
 	}
 
 	c.resolvePaths()

@@ -490,6 +490,11 @@ func TestCleanOldHistory_Threshold(t *testing.T) {
 		{"threshold one item", 5, 1, 1, 1, nil},
 		{"no-op when total at or below threshold", 5, 10, 3, 5, nil},
 		{"no-op when keep reaches total", 5, 3, 5, 5, nil},
+		{"keep zero wipes when over threshold", 10, 5, 0, 0, nil},
+		{"keep zero no-op when under threshold", 3, 10, 0, 3, nil},
+		{"threshold zero trims to keep", 10, 0, 3, 3, []string{"item-9", "item-8", "item-7"}},
+		{"threshold zero keep zero wipes all", 5, 0, 0, 0, nil},
+		{"empty db keep and threshold zero", 0, 0, 0, 0, nil},
 	}
 
 	for _, tt := range tests {

@@ -49,7 +49,7 @@ func readConfig() error {
 	viper.SetDefault(LogFile, "")
 	viper.SetDefault(PIDFile, "")
 	viper.SetDefault(Tool, "")
-	viper.SetDefault(TTL, 0)
+	viper.SetDefault(TTL, DefaultTTL)
 	viper.SetDefault(Limit, DefaultLimit)
 	viper.SetDefault(Keep, DefaultKeep)
 	viper.SetDefault(Threshold, DefaultThreshold)

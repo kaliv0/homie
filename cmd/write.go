@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/kaliv0/homie/internal/clipboard"
 	"github.com/kaliv0/homie/internal/config"
 	"github.com/kaliv0/homie/internal/log"
 	"github.com/kaliv0/homie/internal/storage"
@@ -26,7 +27,7 @@ var writeCmd = &cobra.Command{
 			return
 		}
 
-		if err := writeToClipboard(cfg, text); err != nil {
+		if err := clipboard.WriteSelection(text); err != nil {
 			log.Logger().Fatal(err)
 		}
 

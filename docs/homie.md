@@ -51,3 +51,4 @@ Terminal-based clipboard manager
 - [homie stop](homie_stop.md) - Stop clipboard manager
 - [homie restart](homie_restart.md) - Restart clipboard manager
 - [homie status](homie_status.md) - Show daemon status
+- [.homierc](homierc.md) - Optional YAML configuration

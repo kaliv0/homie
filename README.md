@@ -21,8 +21,6 @@ Supports <i>fuzzy search</i>, <i>multi-select</i> and other adorable <i>chicaner
 go install github.com/kaliv0/homie@latest
 ```
 
-On `linux` you would also need `xclip`, `xsel` or `wl-clipboard` installed as an external dependency
-
 ---
 
 ## Usage
@@ -93,7 +91,7 @@ After that it will scan the database and if there are records above certain limi
 - You can control this behavior creating a <i>.homierc</i> config inside your <i>root</i> directory.
   (See [.homierc example](https://github.com/kaliv0/homie/blob/main/examples/.homierc))
 - Using `ttl` strategy will delete the oldest records (specified in the config as <i>ttl: \<days></i>) disregarding the total amount of items in the db.
-- To disable entirely the <i>history clean-up</i> phase, put <i>clean_up: false</i> in the `.homierc`.
+- Size-based cleanup runs when `ttl` is `0` (or unset) and the history count exceeds `threshold`, preserving `keep` rows.
 
 ---
 

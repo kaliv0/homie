@@ -1,8 +1,7 @@
-clean_up: true                       # run cleanup on daemon start (ttl or max_size/min_size)
+limit: 20                            # number of retrieved history items per page
 ttl: 7                               # retention period in days
-#min_size: 20                        # minimum rows kept after clean_up
-#max_size: 500                       # maximum amount of stored records
-tool: xclip                          # xclip, xsel, or wl-clipboard (clipboard text management on linux)
+#keep: 20                            # rows kept after size-based cleanup
+#threshold: 500                      # cleanup triggers when stored records exceed this
 #verbose: true                       # diagnostic messages to stderr (and log file when teeing)
 #log_file: ~/.local/state/homie.log  # append logs here (file permissions -> 0o600)
 #pid_file: ~/.local/state/homie.pid  # daemon pidfile (default -> $XDG_RUNTIME_DIR/homie.pid)

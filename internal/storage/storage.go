@@ -17,7 +17,7 @@ import (
 const (
 	maxDbConnections = 2
 	connMaxTimespan  = 5 * time.Minute
-	dbBusyTimeout    = 5 * time.Second
+	dbBusyTimeout    = 3 * time.Second
 	journalMode      = "WAL"
 	dbSync           = "NORMAL"
 )
@@ -222,18 +222,13 @@ func (r *Repository) Close() error {
 
 // CleanupConfig holds settings for history cleanup.
 type CleanupConfig struct {
-	CleanUp bool
-	TTL     int
-	MaxSize int
-	MinSize int
+	TTL       int
+	Keep      int
+	Threshold int
 }
 
-// CleanOldHistory trims clipboard history based on ttl or max_size settings.
+// CleanOldHistory trims clipboard history based on ttl or threshold settings.
 func CleanOldHistory(db *Repository, cfg CleanupConfig) error {
-	if !cfg.CleanUp {
-		return nil
-	}
-
 	// ttl takes precedence over 'size limit' strategy
 	if cfg.TTL > 0 {
 		return db.DeleteOldest(cfg.TTL)
@@ -244,8 +239,8 @@ func CleanOldHistory(db *Repository, cfg CleanupConfig) error {
 		return err
 	}
 
-	if total <= cfg.MaxSize || cfg.MinSize >= total {
+	if total <= cfg.Threshold || cfg.Keep >= total {
 		return nil
 	}
-	return db.DeleteExcess(total - cfg.MinSize)
+	return db.DeleteExcess(total - cfg.Keep)
 }

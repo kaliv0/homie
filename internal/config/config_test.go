@@ -45,6 +45,9 @@ func TestDBPath_WithXDG(t *testing.T) {
 	if !info.IsDir() {
 		t.Errorf("expected %q to be a directory", dir)
 	}
+	if info.Mode().Perm() != dbConfDirPerm {
+		t.Errorf("expected permissions %o, got %o", dbConfDirPerm, info.Mode().Perm())
+	}
 }
 
 func TestDBPath_WithoutXDG(t *testing.T) {
@@ -57,41 +60,6 @@ func TestDBPath_WithoutXDG(t *testing.T) {
 	expected := filepath.Join(tmpDir, dbConfDirName, dbSubdirName, dbFileName)
 	if path != expected {
 		t.Errorf("expected path=%q, got %q", expected, path)
-	}
-}
-
-func TestDBPath_Properties(t *testing.T) {
-	tests := []struct {
-		name  string
-		check func(t *testing.T, path string)
-	}{
-		{"creates directory with correct permissions", func(t *testing.T, path string) {
-			info, err := os.Stat(filepath.Dir(path))
-			if err != nil {
-				t.Fatalf("directory not created: %v", err)
-			}
-			if info.Mode().Perm() != dbConfDirPerm {
-				t.Errorf("expected permissions %o, got %o", dbConfDirPerm, info.Mode().Perm())
-			}
-		}},
-		{"correct filename", func(t *testing.T, path string) {
-			if filepath.Base(path) != dbFileName {
-				t.Errorf("expected filename=%q, got %q", dbFileName, filepath.Base(path))
-			}
-		}},
-		{"correct subdir", func(t *testing.T, path string) {
-			if filepath.Base(filepath.Dir(path)) != dbSubdirName {
-				t.Errorf("expected subdir=%q, got %q", dbSubdirName, filepath.Base(filepath.Dir(path)))
-			}
-		}},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			resetDBPath(t, t.TempDir())
-			path := mustDBPath(t)
-			tt.check(t, path)
-		})
 	}
 }
 

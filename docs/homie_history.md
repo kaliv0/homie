@@ -22,3 +22,4 @@ homie history [flags]
 ### SEE ALSO
 
 - [homie](homie.md) - Terminal-based clipboard manager
+- [.homierc](homierc.md) - Optional YAML configuration (`limit` and related settings)

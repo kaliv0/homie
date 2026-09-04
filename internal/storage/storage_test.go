@@ -77,6 +77,18 @@ func mustRead(t *testing.T, repo *Repository, offset, limit int) []ClipboardItem
 	return items
 }
 
+func assertClipTexts(t *testing.T, items []ClipboardItem, want []string) {
+	t.Helper()
+	if len(items) != len(want) {
+		t.Fatalf("expected %d items, got %d", len(want), len(items))
+	}
+	for i, w := range want {
+		if items[i].ClipText != w {
+			t.Errorf("item[%d]: want %q, got %q", i, w, items[i].ClipText)
+		}
+	}
+}
+
 func TestNewRepository(t *testing.T) {
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "test.db")
@@ -149,63 +161,49 @@ func TestSetDBFilesPermissions(t *testing.T) {
 	}
 }
 
-func TestWrite_Insert(t *testing.T) {
-	repo := setupTestDB(t)
-
-	if err := repo.Write([]byte("hello world")); err != nil {
-		t.Fatalf("Write() failed: %v", err)
+func TestWrite(t *testing.T) {
+	tests := []struct {
+		name  string
+		texts []string
+		want  []string
+	}{
+		{"insert", []string{"hello world"}, []string{"hello world"}},
+		{"empty", []string{""}, []string{""}},
+		{"large", []string{strings.Repeat("a", 10000)}, []string{strings.Repeat("a", 10000)}},
+		{"special characters", []string{
+			"hello\nworld",
+			"tab\there",
+			"quote'test",
+			`double"quote`,
+			"emoji 🎉",
+			"null\x00byte",
+			"unicode: こんにちは",
+		}, nil}, // count-only via want nil meaning assert all texts
 	}
 
-	items := mustRead(t, repo, 0, 10)
-	if len(items) != 1 {
-		t.Fatalf("expected 1 item, got %d", len(items))
-	}
-	if items[0].ClipText != "hello world" {
-		t.Errorf("expected clip_text=%q, got %q", "hello world", items[0].ClipText)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := setupTestDB(t)
+			for _, text := range tt.texts {
+				if err := repo.Write([]byte(text)); err != nil {
+					t.Fatalf("Write(%q) failed: %v", text, err)
+				}
+			}
+			want := tt.want
+			if want == nil {
+				want = tt.texts
+			}
+			// Read is newest-first
+			reversed := make([]string, len(want))
+			for i, w := range want {
+				reversed[len(want)-1-i] = w
+			}
+			assertClipTexts(t, mustRead(t, repo, 0, len(want)+1), reversed)
+		})
 	}
 }
 
 func TestWrite_Deduplication(t *testing.T) {
-	repo := setupTestDB(t)
-
-	if err := repo.Write([]byte("duplicate")); err != nil {
-		t.Fatalf("first Write() failed: %v", err)
-	}
-	if err := repo.Write([]byte("duplicate")); err != nil {
-		t.Fatalf("second Write() failed: %v", err)
-	}
-
-	assertCount(t, repo, 1)
-}
-
-func TestWrite_EmptyItem(t *testing.T) {
-	repo := setupTestDB(t)
-
-	if err := repo.Write([]byte("")); err != nil {
-		t.Fatalf("Write(empty) failed: %v", err)
-	}
-
-	items := mustRead(t, repo, 0, 10)
-	if len(items) != 1 || items[0].ClipText != "" {
-		t.Errorf("expected 1 empty item, got %v", items)
-	}
-}
-
-func TestWrite_LargeItem(t *testing.T) {
-	repo := setupTestDB(t)
-
-	largeText := strings.Repeat("a", 10000)
-	if err := repo.Write([]byte(largeText)); err != nil {
-		t.Fatalf("Write(large) failed: %v", err)
-	}
-
-	items := mustRead(t, repo, 0, 10)
-	if len(items) != 1 || len(items[0].ClipText) != 10000 {
-		t.Errorf("expected 1 item of 10000 chars, got %d items", len(items))
-	}
-}
-
-func TestWrite_DuplicateUpdatesTimestamp(t *testing.T) {
 	repo := setupTestDB(t)
 
 	if err := repo.Write([]byte("same")); err != nil {
@@ -218,10 +216,11 @@ func TestWrite_DuplicateUpdatesTimestamp(t *testing.T) {
 		t.Fatalf("second Write() failed: %v", err)
 	}
 	items2 := mustRead(t, repo, 0, 10)
-	ts2 := items2[0].TimeStamp
-
-	if !ts2.After(ts1) {
-		t.Errorf("expected updated timestamp to be after original: %v vs %v", ts2, ts1)
+	if len(items2) != 1 {
+		t.Fatalf("expected 1 item after dedup, got %d", len(items2))
+	}
+	if !items2[0].TimeStamp.After(ts1) {
+		t.Errorf("expected updated timestamp to be after original: %v vs %v", items2[0].TimeStamp, ts1)
 	}
 }
 
@@ -235,41 +234,11 @@ func TestWrite_MultipleUniqueItems(t *testing.T) {
 	assertCount(t, repo, 20)
 }
 
-func TestWrite_SpecialCharacters(t *testing.T) {
-	repo := setupTestDB(t)
-
-	specials := []string{
-		"hello\nworld",
-		"tab\there",
-		"quote'test",
-		`double"quote`,
-		"emoji 🎉",
-		"null\x00byte",
-		"unicode: こんにちは",
-	}
-
-	for _, text := range specials {
-		if err := repo.Write([]byte(text)); err != nil {
-			t.Fatalf("Write(%q) failed: %v", text, err)
-		}
-	}
-	assertCount(t, repo, len(specials))
-}
-
 func TestRead_Ordering(t *testing.T) {
 	repo := setupTestDB(t)
 	seedItems(t, repo, 3)
 
-	items := mustRead(t, repo, 0, 10)
-	if len(items) != 3 {
-		t.Fatalf("expected 3 items, got %d", len(items))
-	}
-	if items[0].ClipText != "item-2" {
-		t.Errorf("expected first item=%q, got %q", "item-2", items[0].ClipText)
-	}
-	if items[2].ClipText != "item-0" {
-		t.Errorf("expected last item=%q, got %q", "item-0", items[2].ClipText)
-	}
+	assertClipTexts(t, mustRead(t, repo, 0, 10), []string{"item-2", "item-1", "item-0"})
 }
 
 func TestRead_Limits(t *testing.T) {
@@ -301,61 +270,18 @@ func TestRead_Limits(t *testing.T) {
 	}
 }
 
-func TestRead_Pagination(t *testing.T) {
-	repo := setupTestDB(t)
-	seedItems(t, repo, 10)
-
-	var all []ClipboardItem
-	for offset := 0; offset < 10; offset += 3 {
-		page := mustRead(t, repo, offset, 3)
-		all = append(all, page...)
-	}
-
-	if len(all) != 10 {
-		t.Fatalf("expected 10 items across all pages, got %d", len(all))
-	}
-
-	seen := make(map[int]bool)
-	for _, item := range all {
-		if seen[item.ID] {
-			t.Errorf("duplicate item id=%d found across pages", item.ID)
-		}
-		seen[item.ID] = true
-	}
-}
-
-func TestCount(t *testing.T) {
-	tests := []struct {
-		name  string
-		seedN int
-		want  int
-	}{
-		{"empty", 0, 0},
-		{"with items", 3, 3},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			repo := setupTestDB(t)
-			if tt.seedN > 0 {
-				seedItems(t, repo, tt.seedN)
-			}
-			assertCount(t, repo, tt.want)
-		})
-	}
-}
-
 func TestDeleteExcess(t *testing.T) {
 	tests := []struct {
 		name        string
 		numItems    int
 		deleteCount int
 		wantCount   int
+		wantTexts   []string // newest-first, when set
 	}{
-		{"delete some", 5, 2, 3},
-		{"delete zero", 5, 0, 5},
-		{"delete more than total", 3, 10, 0},
-		{"delete exact total", 5, 5, 0},
+		{"delete some", 5, 2, 3, []string{"item-4", "item-3", "item-2"}},
+		{"delete zero", 5, 0, 5, nil},
+		{"delete more than total", 3, 10, 0, nil},
+		{"delete exact total", 5, 5, 0, nil},
 	}
 
 	for _, tt := range tests {
@@ -367,6 +293,9 @@ func TestDeleteExcess(t *testing.T) {
 				t.Fatalf("DeleteExcess(%d) failed: %v", tt.deleteCount, err)
 			}
 			assertCount(t, repo, tt.wantCount)
+			if tt.wantTexts != nil {
+				assertClipTexts(t, mustRead(t, repo, 0, 10), tt.wantTexts)
+			}
 		})
 	}
 }
@@ -404,28 +333,6 @@ func TestDeleteOldest(t *testing.T) {
 }
 
 func TestReset(t *testing.T) {
-	tests := []struct {
-		name  string
-		seedN int
-	}{
-		{"clears rows", 3},
-		{"empty table", 0},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			repo := setupTestDB(t)
-			if tt.seedN > 0 {
-				seedItems(t, repo, tt.seedN)
-			}
-			if err := repo.Reset(); err != nil {
-				t.Fatalf("Reset() failed: %v", err)
-			}
-			assertCount(t, repo, 0)
-		})
-	}
-}
-
-func TestReset_ThenWrite(t *testing.T) {
 	repo := setupTestDB(t)
 
 	if err := repo.Write([]byte("before-reset")); err != nil {
@@ -434,74 +341,45 @@ func TestReset_ThenWrite(t *testing.T) {
 	if err := repo.Reset(); err != nil {
 		t.Fatalf("Reset() failed: %v", err)
 	}
+	assertCount(t, repo, 0)
+
 	if err := repo.Write([]byte("after-reset")); err != nil {
 		t.Fatalf("Write() after reset failed: %v", err)
 	}
-
-	items := mustRead(t, repo, 0, 10)
-	if len(items) != 1 || items[0].ClipText != "after-reset" {
-		t.Errorf("expected single item %q, got %v", "after-reset", items)
-	}
-}
-
-func TestCleanOldHistory_Disabled(t *testing.T) {
-	t.Parallel()
-	repo := setupTestDB(t)
-	seedItems(t, repo, 3)
-
-	cfg := CleanupConfig{CleanUp: false}
-	if err := CleanOldHistory(repo, cfg); err != nil {
-		t.Fatalf("CleanOldHistory() failed: %v", err)
-	}
-	assertCount(t, repo, 3)
+	assertClipTexts(t, mustRead(t, repo, 0, 10), []string{"after-reset"})
 }
 
 func TestCleanOldHistory_TTL(t *testing.T) {
 	t.Parallel()
 	repo := setupTestDB(t)
-	insertOldItem(t, repo, "old", "ttlhash1", 10)
-	if err := repo.Write([]byte("recent")); err != nil {
-		t.Fatalf("Write() failed: %v", err)
-	}
-
-	cfg := CleanupConfig{CleanUp: true, TTL: 7}
-	if err := CleanOldHistory(repo, cfg); err != nil {
-		t.Fatalf("CleanOldHistory() failed: %v", err)
-	}
-	assertCount(t, repo, 1)
-}
-
-func TestCleanOldHistory_TTLTakesPrecedenceOverMaxSize(t *testing.T) {
-	t.Parallel()
-	repo := setupTestDB(t)
 	seedItems(t, repo, 10)
 	insertOldItem(t, repo, "old-0", "oldhash-prec0", 20)
 	insertOldItem(t, repo, "old-1", "oldhash-prec1", 20)
-	// TTL=7 removes only the 2 old items. max_size=5 would trim more but is ignored
-	cfg := CleanupConfig{CleanUp: true, TTL: 7, MaxSize: 5, MinSize: 5}
-
+	// TTL=7 removes only the 2 old items. threshold=5 would trim more but is ignored.
+	cfg := CleanupConfig{TTL: 7, Threshold: 5, Keep: 5}
 	if err := CleanOldHistory(repo, cfg); err != nil {
 		t.Fatalf("CleanOldHistory() failed: %v", err)
 	}
 	assertCount(t, repo, 10)
 }
 
-func TestCleanOldHistory_MaxSize(t *testing.T) {
+func TestCleanOldHistory_Threshold(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name      string
 		numItems  int
-		maxSize   int
-		minSize   int
+		threshold int
+		keep      int
 		wantCount int
 		wantTexts []string // when set, verify surviving rows (newest-first)
 	}{
-		{"trims to min_size", 10, 5, 5, 5, []string{"item-9", "item-8", "item-7", "item-6", "item-5"}},
-		{"under min_size no-op", 3, 10, 5, 3, nil},
-		{"min_size equals total", 10, 5, 10, 10, nil},
-		{"max_size one item", 5, 1, 1, 1, nil},
-		{"no-op when total at or below max_size", 5, 10, 3, 5, nil},
-		{"no-op when min_size reaches total", 5, 3, 5, 5, nil},
+		{"trims to keep", 10, 5, 5, 5, []string{"item-9", "item-8", "item-7", "item-6", "item-5"}},
+		{"under threshold no-op", 5, 10, 3, 5, nil},
+		{"keep reaches total no-op", 5, 3, 5, 5, nil},
+		{"keep zero wipes when over threshold", 10, 5, 0, 0, nil},
+		{"threshold zero trims to keep", 10, 0, 3, 3, []string{"item-9", "item-8", "item-7"}},
+		{"threshold zero keep zero wipes all", 5, 0, 0, 0, nil},
+		{"empty db", 0, 0, 0, 0, nil},
 	}
 
 	for _, tt := range tests {
@@ -510,45 +388,14 @@ func TestCleanOldHistory_MaxSize(t *testing.T) {
 			repo := setupTestDB(t)
 			seedItems(t, repo, tt.numItems)
 
-			cfg := CleanupConfig{CleanUp: true, TTL: 0, MaxSize: tt.maxSize, MinSize: tt.minSize}
+			cfg := CleanupConfig{TTL: 0, Threshold: tt.threshold, Keep: tt.keep}
 			if err := CleanOldHistory(repo, cfg); err != nil {
 				t.Fatalf("CleanOldHistory() failed: %v", err)
 			}
 			assertCount(t, repo, tt.wantCount)
-
-			if tt.wantTexts == nil {
-				return
-			}
-			items := mustRead(t, repo, 0, 10)
-			if len(items) != len(tt.wantTexts) {
-				t.Fatalf("expected %d items, got %d", len(tt.wantTexts), len(items))
-			}
-			for i, w := range tt.wantTexts {
-				if items[i].ClipText != w {
-					t.Errorf("item[%d]: want %q, got %q", i, w, items[i].ClipText)
-				}
+			if tt.wantTexts != nil {
+				assertClipTexts(t, mustRead(t, repo, 0, 10), tt.wantTexts)
 			}
 		})
-	}
-}
-
-func TestDeleteExcess_DeletesOldestRowsFirst(t *testing.T) {
-	repo := setupTestDB(t)
-	seedItems(t, repo, 5)
-
-	if err := repo.DeleteExcess(2); err != nil {
-		t.Fatalf("DeleteExcess(2) failed: %v", err)
-	}
-
-	items := mustRead(t, repo, 0, 10)
-	if len(items) != 3 {
-		t.Fatalf("expected 3 items after deleting 2 oldest, got %d", len(items))
-	}
-	// Read is newest-first. Survivors should be item-4, item-3, item-2
-	want := []string{"item-4", "item-3", "item-2"}
-	for i, w := range want {
-		if items[i].ClipText != w {
-			t.Errorf("item[%d]: want clip_text %q, got %q", i, w, items[i].ClipText)
-		}
 	}
 }

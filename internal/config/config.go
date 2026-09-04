@@ -13,14 +13,13 @@ import (
 
 // ~/.homierc keys
 const (
-	Verbose = "verbose"
-	LogFile = "log_file"
-	PIDFile = "pid_file"
-	MinSize = "min_size"
-	CleanUp = "clean_up"
-	TTL     = "ttl"
-	MaxSize = "max_size"
-	Tool    = "tool"
+	Verbose   = "verbose"
+	LogFile   = "log_file"
+	PIDFile   = "pid_file"
+	Limit     = "limit"
+	TTL       = "ttl"
+	Keep      = "keep"
+	Threshold = "threshold"
 )
 
 const (
@@ -48,11 +47,10 @@ func readConfig() error {
 	viper.SetDefault(Verbose, false)
 	viper.SetDefault(LogFile, "")
 	viper.SetDefault(PIDFile, "")
-	viper.SetDefault(MinSize, DefaultMinSize)
-	viper.SetDefault(CleanUp, false)
-	viper.SetDefault(TTL, 0)
-	viper.SetDefault(MaxSize, DefaultMaxSize)
-	viper.SetDefault(Tool, "")
+	viper.SetDefault(TTL, DefaultTTL)
+	viper.SetDefault(Limit, DefaultLimit)
+	viper.SetDefault(Keep, DefaultKeep)
+	viper.SetDefault(Threshold, DefaultThreshold)
 
 	viper.SetConfigName(confFileName)
 	viper.SetConfigType(confFileType)

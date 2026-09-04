@@ -11,9 +11,20 @@ import (
 	"github.com/spf13/viper"
 )
 
+func applyHomieDefaults(v *viper.Viper) {
+	v.SetDefault(Verbose, false)
+	v.SetDefault(LogFile, "")
+	v.SetDefault(PIDFile, "")
+	v.SetDefault(Limit, DefaultLimit)
+	v.SetDefault(TTL, DefaultTTL)
+	v.SetDefault(Keep, DefaultKeep)
+	v.SetDefault(Threshold, DefaultThreshold)
+}
+
 func viperFromYAML(t *testing.T, yaml string) *viper.Viper {
 	t.Helper()
 	v := viper.New()
+	applyHomieDefaults(v)
 	if yaml == "" {
 		return v
 	}
@@ -41,57 +52,71 @@ func captureStderr(t *testing.T, fn func()) string {
 	return buf.String()
 }
 
+func assertNormalized(t *testing.T, got, want Config) {
+	t.Helper()
+	if got.Keep != want.Keep || got.TTL != want.TTL || got.Threshold != want.Threshold || got.Limit != want.Limit {
+		t.Fatalf("got Keep=%d TTL=%d Threshold=%d Limit=%d, want Keep=%d TTL=%d Threshold=%d Limit=%d",
+			got.Keep, got.TTL, got.Threshold, got.Limit,
+			want.Keep, want.TTL, want.Threshold, want.Limit)
+	}
+}
+
 func TestConfig_normalize(t *testing.T) {
 	tests := []struct {
-		name       string
-		before     Config
-		want       Config
-		verbose    bool
-		checkWarn  bool
-		wantSilent bool // when checkWarn, expect no stderr
+		name   string
+		before Config
+		want   Config
 	}{
 		{
-			name:   "clamps negative values",
-			before: Config{MinSize: -2, TTL: -7, MaxSize: -100},
-			want:   Config{MinSize: DefaultMinSize, TTL: 0, MaxSize: DefaultMaxSize},
+			name:   "normalizes negative values",
+			before: Config{Keep: -2, TTL: -7, Threshold: -100, Limit: -4},
+			want:   Config{Keep: DefaultKeep, TTL: 0, Threshold: DefaultThreshold, Limit: DefaultLimit},
 		},
 		{
-			name:   "clamps zero min_size and max_size",
-			before: Config{MinSize: 0, MaxSize: 0},
-			want:   Config{MinSize: DefaultMinSize, MaxSize: DefaultMaxSize},
+			name:   "keeps zero keep threshold and limit",
+			before: Config{Keep: 0, Threshold: 0, Limit: 0},
+			want:   Config{Keep: 0, Threshold: 0, Limit: 0},
 		},
 		{
 			name:   "keeps valid values",
-			before: Config{MinSize: 12, TTL: 7, MaxSize: 300},
-			want:   Config{MinSize: 12, TTL: 7, MaxSize: 300},
+			before: Config{Keep: 12, TTL: 7, Threshold: 300, Limit: 8},
+			want:   Config{Keep: 12, TTL: 7, Threshold: 300, Limit: 8},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := tt.before
+			c.normalize()
+			assertNormalized(t, c, tt.want)
+		})
+	}
+}
+
+func TestConfig_normalize_warnings(t *testing.T) {
+	tests := []struct {
+		name      string
+		before    Config
+		verbose   bool
+		wantEmpty bool
+		wantSub   []string
+	}{
+		{
+			name:      "silent when not verbose",
+			before:    Config{Keep: -1, TTL: -1, Threshold: -1, Limit: -1},
+			wantEmpty: true,
 		},
 		{
-			name:       "no warn when not verbose",
-			before:     Config{MinSize: -1, TTL: -1, MaxSize: -1},
-			want:       Config{MinSize: DefaultMinSize, TTL: 0, MaxSize: DefaultMaxSize},
-			checkWarn:  true,
-			wantSilent: true,
-		},
-		{
-			name:       "no warn for zero values when verbose",
-			before:     Config{MinSize: 0, MaxSize: 0, TTL: 0},
-			want:       Config{MinSize: DefaultMinSize, MaxSize: DefaultMaxSize, TTL: 0},
-			verbose:    true,
-			checkWarn:  true,
-			wantSilent: true,
-		},
-		{
-			name:      "warns when verbose and negative",
-			before:    Config{MinSize: -2, TTL: -2, MaxSize: -3},
-			want:      Config{MinSize: DefaultMinSize, TTL: 0, MaxSize: DefaultMaxSize},
+			name:      "silent for zero ttl when verbose",
+			before:    Config{Keep: DefaultKeep, Threshold: DefaultThreshold, TTL: 0, Limit: DefaultLimit},
 			verbose:   true,
-			checkWarn: true,
+			wantEmpty: true,
 		},
 		{
-			name:      "clears unknown tool with warning",
-			before:    Config{Tool: "pbcopy", MinSize: 10, MaxSize: 300},
-			want:      Config{Tool: "", MinSize: 10, MaxSize: 300},
-			checkWarn: true,
+			name:    "warns when verbose and negative",
+			before:  Config{Keep: -2, TTL: -2, Threshold: -3, Limit: -4},
+			verbose: true,
+			wantSub: []string{"keep", "ttl", "threshold", "limit"},
 		},
 	}
 
@@ -99,23 +124,9 @@ func TestConfig_normalize(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			c := tt.before
 			c.Verbose = tt.verbose
+			stderr := captureStderr(t, c.normalize)
 
-			var stderr string
-			if tt.checkWarn {
-				stderr = captureStderr(t, c.normalize)
-			} else {
-				c.normalize()
-			}
-
-			if c.MinSize != tt.want.MinSize || c.TTL != tt.want.TTL || c.MaxSize != tt.want.MaxSize || c.Tool != tt.want.Tool {
-				t.Fatalf("after normalize: got MinSize=%d TTL=%d MaxSize=%d Tool=%q, want MinSize=%d TTL=%d MaxSize=%d Tool=%q",
-					c.MinSize, c.TTL, c.MaxSize, c.Tool, tt.want.MinSize, tt.want.TTL, tt.want.MaxSize, tt.want.Tool)
-			}
-
-			if !tt.checkWarn {
-				return
-			}
-			if tt.wantSilent {
+			if tt.wantEmpty {
 				if stderr != "" {
 					t.Fatalf("expected no warnings, got %q", stderr)
 				}
@@ -125,13 +136,7 @@ func TestConfig_normalize(t *testing.T) {
 				t.Fatal("expected warnings, got none")
 			}
 			joined := strings.ToLower(stderr)
-			if tt.want.Tool == "" && tt.before.Tool != "" {
-				if !strings.Contains(joined, "tool") {
-					t.Errorf("expected warning mentioning tool, got %q", stderr)
-				}
-				return
-			}
-			for _, key := range []string{"min_size", "ttl", "max_size"} {
+			for _, key := range tt.wantSub {
 				if !strings.Contains(joined, key) {
 					t.Errorf("expected warning mentioning %q, got %q", key, stderr)
 				}
@@ -145,158 +150,90 @@ func TestParse(t *testing.T) {
 	t.Setenv("HOME", tmpDir)
 
 	tests := []struct {
-		name    string
-		yaml    string
-		setup   func(*viper.Viper)
-		wantErr string
-		check   func(t *testing.T, cfg *Config)
+		name string
+		yaml string
+		want Config
 	}{
 		{
 			name: "defaults from empty viper",
-			check: func(t *testing.T, cfg *Config) {
-				if cfg.MinSize != DefaultMinSize || cfg.MaxSize != DefaultMaxSize || cfg.TTL != 0 {
-					t.Fatalf("unexpected defaults: %+v", cfg)
-				}
-				if cfg.Tool != "" {
-					t.Fatalf("Tool = %q, want empty", cfg.Tool)
-				}
-			},
+			want: Config{Keep: DefaultKeep, Threshold: DefaultThreshold, TTL: 0, Limit: DefaultLimit},
 		},
 		{
 			name: "valid config",
-			yaml: "min_size: 15\nclean_up: true\nttl: 7\ntool: xclip\n",
-			check: func(t *testing.T, cfg *Config) {
-				if cfg.MinSize != 15 || !cfg.CleanUp || cfg.TTL != 7 || cfg.Tool != ClipboardXclip {
-					t.Fatalf("cfg = %+v, unexpected values", cfg)
-				}
-			},
+			yaml: "keep: 15\nttl: 7\nlimit: 8\n",
+			want: Config{Keep: 15, TTL: 7, Limit: 8, Threshold: DefaultThreshold},
 		},
 		{
-			name: "ignores legacy limit key",
-			yaml: "limit: 99\nmin_size: 10\n",
-			check: func(t *testing.T, cfg *Config) {
-				if cfg.MinSize != 10 {
-					t.Fatalf("MinSize = %d, want 10 (limit key must not apply)", cfg.MinSize)
-				}
-			},
+			name: "limit does not set keep",
+			yaml: "limit: 99\nkeep: 10\n",
+			want: Config{Keep: 10, Limit: 99, Threshold: DefaultThreshold},
 		},
 		{
-			name: "legacy limit alone does not set min_size",
+			name: "limit alone does not set keep",
 			yaml: "limit: 99\n",
-			check: func(t *testing.T, cfg *Config) {
-				if cfg.MinSize != DefaultMinSize {
-					t.Fatalf("MinSize = %d, want default %d", cfg.MinSize, DefaultMinSize)
-				}
-			},
+			want: Config{Keep: DefaultKeep, Limit: 99, Threshold: DefaultThreshold},
 		},
 		{
-			name: "clamps negative values",
-			yaml: "min_size: -2\nttl: -5\nmax_size: -10\n",
-			check: func(t *testing.T, cfg *Config) {
-				if cfg.MinSize != DefaultMinSize || cfg.TTL != 0 || cfg.MaxSize != DefaultMaxSize {
-					t.Fatalf("cfg = %+v, want clamped defaults", cfg)
-				}
-			},
+			name: "preserves explicit zeros",
+			yaml: "keep: 0\nthreshold: 0\nlimit: 0\n",
+			want: Config{Keep: 0, Threshold: 0, Limit: 0},
 		},
 		{
-			name: "clears unknown tool",
-			yaml: "tool: pbcopy\n",
-			check: func(t *testing.T, cfg *Config) {
-				if cfg.Tool != "" {
-					t.Fatalf("Tool = %q, want empty", cfg.Tool)
-				}
-			},
+			name: "preserves zero keep only",
+			yaml: "keep: 0\n",
+			want: Config{Keep: 0, Threshold: DefaultThreshold, Limit: DefaultLimit},
 		},
 		{
-			name: "accepts xsel",
-			yaml: "tool: xsel\n",
-			check: func(t *testing.T, cfg *Config) {
-				if cfg.Tool != ClipboardXsel {
-					t.Fatalf("Tool = %q, want %q", cfg.Tool, ClipboardXsel)
-				}
-			},
+			name: "preserves zero threshold only",
+			yaml: "threshold: 0\n",
+			want: Config{Keep: DefaultKeep, Threshold: 0, Limit: DefaultLimit},
 		},
 		{
-			name: "accepts wl-clipboard",
-			yaml: "tool: wl-clipboard\n",
-			check: func(t *testing.T, cfg *Config) {
-				if cfg.Tool != ClipboardWLClipboard {
-					t.Fatalf("Tool = %q, want %q", cfg.Tool, ClipboardWLClipboard)
-				}
-			},
-		},
-		{
-			name: "expands log file path",
-			setup: func(v *viper.Viper) {
-				v.Set(LogFile, "~/homie.log")
-			},
-			check: func(t *testing.T, cfg *Config) {
-				want := filepath.Join(tmpDir, "homie.log")
-				if cfg.LogFile != want {
-					t.Errorf("LogFile = %q, want %q", cfg.LogFile, want)
-				}
-			},
-		},
-		{
-			name: "expands pid file path",
-			yaml: "pid_file: ~/state/homie.pid\n",
-			check: func(t *testing.T, cfg *Config) {
-				want := filepath.Join(tmpDir, "state", "homie.pid")
-				if cfg.PIDFile != want {
-					t.Errorf("PIDFile = %q, want %q", cfg.PIDFile, want)
-				}
-			},
-		},
-		{
-			name: "default pid file from XDG_RUNTIME_DIR",
-			setup: func(v *viper.Viper) {
-				t.Setenv("XDG_RUNTIME_DIR", filepath.Join(tmpDir, "runtime"))
-			},
-			check: func(t *testing.T, cfg *Config) {
-				want := filepath.Join(tmpDir, "runtime", pidFileName)
-				if cfg.PIDFile != want {
-					t.Errorf("PIDFile = %q, want %q", cfg.PIDFile, want)
-				}
-			},
+			name: "ignores unknown tool key",
+			yaml: "tool: xclip\n",
+			want: Config{Keep: DefaultKeep, Threshold: DefaultThreshold, Limit: DefaultLimit},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var v *viper.Viper
-			if tt.setup != nil {
-				v = viper.New()
-				tt.setup(v)
-			} else {
-				v = viperFromYAML(t, tt.yaml)
-			}
-
-			cfg, err := Parse(v)
-			if tt.wantErr != "" {
-				if err == nil {
-					t.Fatal("Parse() expected error, got nil")
-				}
-				if !strings.Contains(strings.ToLower(err.Error()), tt.wantErr) {
-					t.Fatalf("Parse() error = %q, want mention of %q", err.Error(), tt.wantErr)
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("Parse() unexpected error: %v", err)
-			}
-			if tt.check != nil {
-				tt.check(t, cfg)
-			}
+			cfg := Parse(viperFromYAML(t, tt.yaml))
+			assertNormalized(t, *cfg, tt.want)
 		})
 	}
+
+	t.Run("expands log file path", func(t *testing.T) {
+		v := viper.New()
+		applyHomieDefaults(v)
+		v.Set(LogFile, "~/homie.log")
+		cfg := Parse(v)
+		want := filepath.Join(tmpDir, "homie.log")
+		if cfg.LogFile != want {
+			t.Errorf("LogFile = %q, want %q", cfg.LogFile, want)
+		}
+	})
+
+	t.Run("expands pid file path", func(t *testing.T) {
+		cfg := Parse(viperFromYAML(t, "pid_file: ~/state/homie.pid\n"))
+		want := filepath.Join(tmpDir, "state", "homie.pid")
+		if cfg.PIDFile != want {
+			t.Errorf("PIDFile = %q, want %q", cfg.PIDFile, want)
+		}
+	})
+
+	t.Run("default pid file from XDG_RUNTIME_DIR", func(t *testing.T) {
+		t.Setenv("XDG_RUNTIME_DIR", filepath.Join(tmpDir, "runtime"))
+		cfg := Parse(viperFromYAML(t, ""))
+		want := filepath.Join(tmpDir, "runtime", pidFileName)
+		if cfg.PIDFile != want {
+			t.Errorf("PIDFile = %q, want %q", cfg.PIDFile, want)
+		}
+	})
 }
 
 func TestPreparePIDFile_createsParentDir(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "nested", "homie.pid")
-	cfg, err := Parse(viperFromYAML(t, "pid_file: "+path+"\n"))
-	if err != nil {
-		t.Fatalf("Parse() unexpected error: %v", err)
-	}
+	cfg := Parse(viperFromYAML(t, "pid_file: "+path+"\n"))
 
 	if err := cfg.PreparePIDFile(); err != nil {
 		t.Fatalf("PreparePIDFile() failed: %v", err)

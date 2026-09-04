@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
 	"github.com/kaliv0/homie/internal/clipboard"
 	"github.com/kaliv0/homie/internal/config"
@@ -15,8 +16,6 @@ import (
 	"github.com/kaliv0/homie/internal/storage"
 )
 
-const defaultLimit = 20
-
 var (
 	listHistoryCmd = &cobra.Command{
 		Use:   "history",
@@ -24,11 +23,7 @@ var (
 		Long: `List clipboard history
   Use <tab> to pin and select multiple entries`,
 		Run: func(cmd *cobra.Command, _ []string) {
-			limit, err := cmd.Flags().GetInt("limit")
-			if err != nil {
-				log.Logger().Fatalf("failed to get 'limit' flag: %v", err)
-			}
-			output, err := fetchDisplayHistory(limit)
+			output, err := fetchDisplayHistory(cfg.Limit)
 			if err != nil {
 				log.Logger().Fatal(err)
 			}
@@ -36,7 +31,7 @@ var (
 				return
 			}
 
-			if err = writeToClipboard(cfg, output); err != nil {
+			if err = clipboard.WriteSelection(output); err != nil {
 				log.Logger().Fatal(err)
 			}
 
@@ -44,6 +39,7 @@ var (
 			if err != nil {
 				log.Logger().Fatalf("failed to get 'paste' flag: %v", err)
 			}
+
 			if !shouldPaste {
 				return
 			}
@@ -89,10 +85,6 @@ func fetchDisplayHistory(limit int) (string, error) {
 	return finder.ListHistory(dbPath, limit)
 }
 
-func writeToClipboard(cfg *config.Config, text string) error {
-	return clipboard.WriteSelection(text, cfg.Tool)
-}
-
 func pasteText(text string) error {
 	targetPane := os.Getenv("HOMIE_TARGET_PANE")
 	if targetPane == "" {
@@ -119,7 +111,7 @@ func init() {
 	listHistoryCmd.Flags().IntP(
 		"limit",
 		"l",
-		defaultLimit,
+		config.DefaultLimit,
 		"Limit the number of clipboard history items displayed",
 	)
 	listHistoryCmd.Flags().BoolP(
@@ -131,4 +123,8 @@ func init() {
 
 	rootCmd.AddCommand(listHistoryCmd)
 	rootCmd.AddCommand(clearHistoryCmd)
+
+	if err := viper.BindPFlag("limit", listHistoryCmd.Flags().Lookup("limit")); err != nil {
+		log.Logger().Fatal(err)
+	}
 }

@@ -14,11 +14,7 @@ import (
 
 func testConfig(t *testing.T) *config.Config {
 	t.Helper()
-	cfg, err := config.Parse(viper.New())
-	if err != nil {
-		t.Fatalf("Parse() failed: %v", err)
-	}
-	return cfg
+	return config.Parse(viper.New())
 }
 
 func testPIDFile(t *testing.T) string {

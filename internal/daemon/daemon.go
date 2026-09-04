@@ -144,14 +144,14 @@ func waitUntilRunning(cfg *config.Config) error {
 	return waitForStatus(cfg, true, "start")
 }
 
-func waitForStatus(cfg *config.Config, wantRunning bool, action string) error {
+func waitForStatus(cfg *config.Config, shouldRun bool, action string) error {
 	deadline := time.Now().Add(daemonTimeout)
 	for time.Now().Before(deadline) {
 		running, _, err := Status(cfg)
 		if err != nil {
 			return err
 		}
-		if running == wantRunning {
+		if running == shouldRun {
 			return nil
 		}
 		time.Sleep(pollInterval)

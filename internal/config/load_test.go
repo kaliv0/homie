@@ -19,7 +19,6 @@ func applyHomieDefaults(v *viper.Viper) {
 	v.SetDefault(TTL, DefaultTTL)
 	v.SetDefault(Keep, DefaultKeep)
 	v.SetDefault(Threshold, DefaultThreshold)
-	v.SetDefault(Tool, "")
 }
 
 func viperFromYAML(t *testing.T, yaml string) *viper.Viper {
@@ -55,10 +54,10 @@ func captureStderr(t *testing.T, fn func()) string {
 
 func assertNormalized(t *testing.T, got, want Config) {
 	t.Helper()
-	if got.Keep != want.Keep || got.TTL != want.TTL || got.Threshold != want.Threshold || got.Limit != want.Limit || got.Tool != want.Tool {
-		t.Fatalf("got Keep=%d TTL=%d Threshold=%d Limit=%d Tool=%q, want Keep=%d TTL=%d Threshold=%d Limit=%d Tool=%q",
-			got.Keep, got.TTL, got.Threshold, got.Limit, got.Tool,
-			want.Keep, want.TTL, want.Threshold, want.Limit, want.Tool)
+	if got.Keep != want.Keep || got.TTL != want.TTL || got.Threshold != want.Threshold || got.Limit != want.Limit {
+		t.Fatalf("got Keep=%d TTL=%d Threshold=%d Limit=%d, want Keep=%d TTL=%d Threshold=%d Limit=%d",
+			got.Keep, got.TTL, got.Threshold, got.Limit,
+			want.Keep, want.TTL, want.Threshold, want.Limit)
 	}
 }
 
@@ -80,13 +79,8 @@ func TestConfig_normalize(t *testing.T) {
 		},
 		{
 			name:   "keeps valid values",
-			before: Config{Keep: 12, TTL: 7, Threshold: 300, Limit: 8, Tool: ClipboardXclip},
-			want:   Config{Keep: 12, TTL: 7, Threshold: 300, Limit: 8, Tool: ClipboardXclip},
-		},
-		{
-			name:   "clears unknown tool",
-			before: Config{Tool: "pbcopy", Keep: 10, Threshold: 300, Limit: DefaultLimit},
-			want:   Config{Tool: "", Keep: 10, Threshold: 300, Limit: DefaultLimit},
+			before: Config{Keep: 12, TTL: 7, Threshold: 300, Limit: 8},
+			want:   Config{Keep: 12, TTL: 7, Threshold: 300, Limit: 8},
 		},
 	}
 
@@ -123,11 +117,6 @@ func TestConfig_normalize_warnings(t *testing.T) {
 			before:  Config{Keep: -2, TTL: -2, Threshold: -3, Limit: -4},
 			verbose: true,
 			wantSub: []string{"keep", "ttl", "threshold", "limit"},
-		},
-		{
-			name:    "warns for unknown tool",
-			before:  Config{Tool: "pbcopy", Keep: 10, Threshold: 300, Limit: DefaultLimit},
-			wantSub: []string{"tool"},
 		},
 	}
 
@@ -171,8 +160,8 @@ func TestParse(t *testing.T) {
 		},
 		{
 			name: "valid config",
-			yaml: "keep: 15\nttl: 7\nlimit: 8\ntool: xclip\n",
-			want: Config{Keep: 15, TTL: 7, Limit: 8, Tool: ClipboardXclip, Threshold: DefaultThreshold},
+			yaml: "keep: 15\nttl: 7\nlimit: 8\n",
+			want: Config{Keep: 15, TTL: 7, Limit: 8, Threshold: DefaultThreshold},
 		},
 		{
 			name: "limit does not set keep",
@@ -200,14 +189,9 @@ func TestParse(t *testing.T) {
 			want: Config{Keep: DefaultKeep, Threshold: 0, Limit: DefaultLimit},
 		},
 		{
-			name: "accepts xsel",
-			yaml: "tool: xsel\n",
-			want: Config{Tool: ClipboardXsel, Keep: DefaultKeep, Threshold: DefaultThreshold, Limit: DefaultLimit},
-		},
-		{
-			name: "accepts wl-clipboard",
-			yaml: "tool: wl-clipboard\n",
-			want: Config{Tool: ClipboardWLClipboard, Keep: DefaultKeep, Threshold: DefaultThreshold, Limit: DefaultLimit},
+			name: "ignores unknown tool key",
+			yaml: "tool: xclip\n",
+			want: Config{Keep: DefaultKeep, Threshold: DefaultThreshold, Limit: DefaultLimit},
 		},
 	}
 

@@ -2,7 +2,6 @@ limit: 20                            # number of retrieved history items per pag
 ttl: 7                               # retention period in days
 #keep: 20                            # rows kept after size-based cleanup
 #threshold: 500                      # cleanup triggers when stored records exceed this
-tool: xclip                          # xclip, xsel, or wl-clipboard (clipboard text management on linux)
 #verbose: true                       # diagnostic messages to stderr (and log file when teeing)
 #log_file: ~/.local/state/homie.log  # append logs here (file permissions -> 0o600)
 #pid_file: ~/.local/state/homie.pid  # daemon pidfile (default -> $XDG_RUNTIME_DIR/homie.pid)

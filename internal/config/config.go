@@ -20,7 +20,6 @@ const (
 	TTL       = "ttl"
 	Keep      = "keep"
 	Threshold = "threshold"
-	Tool      = "tool"
 )
 
 const (
@@ -48,7 +47,6 @@ func readConfig() error {
 	viper.SetDefault(Verbose, false)
 	viper.SetDefault(LogFile, "")
 	viper.SetDefault(PIDFile, "")
-	viper.SetDefault(Tool, "")
 	viper.SetDefault(TTL, DefaultTTL)
 	viper.SetDefault(Limit, DefaultLimit)
 	viper.SetDefault(Keep, DefaultKeep)

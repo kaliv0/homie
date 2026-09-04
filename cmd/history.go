@@ -31,7 +31,7 @@ var (
 				return
 			}
 
-			if err = writeToClipboard(cfg, output); err != nil {
+			if err = clipboard.WriteSelection(output); err != nil {
 				log.Logger().Fatal(err)
 			}
 
@@ -39,6 +39,7 @@ var (
 			if err != nil {
 				log.Logger().Fatalf("failed to get 'paste' flag: %v", err)
 			}
+
 			if !shouldPaste {
 				return
 			}
@@ -82,10 +83,6 @@ func fetchDisplayHistory(limit int) (string, error) {
 		return "", err
 	}
 	return finder.ListHistory(dbPath, limit)
-}
-
-func writeToClipboard(cfg *config.Config, text string) error {
-	return clipboard.WriteSelection(text, cfg.Tool)
 }
 
 func pasteText(text string) error {

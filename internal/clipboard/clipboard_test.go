@@ -129,14 +129,65 @@ func TestTrackClipboard_WriteError(t *testing.T) {
 	}
 }
 
-func TestTrackClipboard_EmptyItem(t *testing.T) {
+func TestTrackClipboard_SkipsEmptyItem(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		bytes []byte
+	}{
+		{name: "nil", bytes: nil},
+		{name: "empty", bytes: []byte{}},
+		{name: "spaces", bytes: []byte("   ")},
+		{name: "tabs and newlines", bytes: []byte("\t\n\r ")},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			writer := &mockWriter{}
+			err := trackClosed(t, writer, gclip.Data{Format: gclip.FmtText, Bytes: tt.bytes})
+			if err != nil {
+				t.Fatalf("TrackClipboard() failed: %v", err)
+			}
+			if len(writer.items) != 0 {
+				t.Fatalf("expected no writes for empty item, got %d", len(writer.items))
+			}
+		})
+	}
+}
+
+func TestTrackClipboard_KeepsWhitespacePaddedContent(t *testing.T) {
 	t.Parallel()
 	writer := &mockWriter{}
-	if err := trackClosed(t, writer, gclip.Data{Format: gclip.FmtText, Bytes: nil}); err != nil {
+	err := trackClosed(t, writer, gclip.Data{Format: gclip.FmtText, Bytes: []byte("  hello  ")})
+	if err != nil {
 		t.Fatalf("TrackClipboard() failed: %v", err)
 	}
 	if len(writer.items) != 1 {
 		t.Fatalf("expected 1 item, got %d", len(writer.items))
+	}
+	if string(writer.items[0]) != "  hello  " {
+		t.Errorf("got %q, want %q", writer.items[0], "  hello  ")
+	}
+}
+
+func TestTrackClipboard_EmptyItemStopsWatch(t *testing.T) {
+	t.Parallel()
+	writer := &mockWriter{}
+	err := trackClosed(t, writer,
+		gclip.Data{Format: gclip.FmtText, Bytes: []byte("first")},
+		gclip.Data{Format: gclip.FmtText, Bytes: []byte("  ")},
+		gclip.Data{Format: gclip.FmtText, Bytes: []byte("after-empty")},
+	)
+	if err != nil {
+		t.Fatalf("TrackClipboard() failed: %v", err)
+	}
+	if len(writer.items) != 1 {
+		t.Fatalf("expected 1 item before empty stop, got %d", len(writer.items))
+	}
+	if string(writer.items[0]) != "first" {
+		t.Errorf("got %q, want %q", writer.items[0], "first")
 	}
 }
 

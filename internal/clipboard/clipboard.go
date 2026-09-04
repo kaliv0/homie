@@ -1,6 +1,7 @@
 package clipboard
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"time"
@@ -21,6 +22,9 @@ func TrackClipboard(ctx context.Context, w Writer, changes <-chan gclip.Data) er
 		select {
 		case item, ok := <-changes:
 			if !ok {
+				return nil
+			}
+			if len(bytes.TrimSpace(item.Bytes)) == 0 {
 				return nil
 			}
 

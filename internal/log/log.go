@@ -50,7 +50,12 @@ func Configure(isVerbose bool, filePath string) {
 	default:
 		out = os.Stderr
 	}
-	std = log.New(out, logPrefix, log.Llongfile)
+
+	flag := log.Lshortfile
+	if isVerbose {
+		flag = log.Llongfile
+	}
+	std = log.New(out, logPrefix, flag)
 }
 
 // swapLogFile closes the current log file (if any) and opens path when non-empty.

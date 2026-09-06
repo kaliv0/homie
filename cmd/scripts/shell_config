@@ -3,10 +3,12 @@ homie start
 
 __homie_history()
 {
-    local output
+    local output before after
     output=$(homie history "$@")
-    READLINE_LINE="${READLINE_LINE}${output}"
-    READLINE_POINT=${#READLINE_LINE}
+    before="${READLINE_LINE:0:READLINE_POINT}"
+    after="${READLINE_LINE:READLINE_POINT}"
+    READLINE_LINE="${before}${output}${after}"
+    READLINE_POINT=$((READLINE_POINT + ${#output}))
 }
 
 # NB: \C-h might conflict with traditional backspace mapping -> change to whatever you like

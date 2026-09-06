@@ -8,9 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/kaliv0/homie/internal/clipboard"
-	"github.com/kaliv0/homie/internal/config"
 	"github.com/kaliv0/homie/internal/log"
-	"github.com/kaliv0/homie/internal/storage"
 )
 
 // used as a workaround to enable copying inside tmux session
@@ -31,20 +29,11 @@ var writeCmd = &cobra.Command{
 			log.Logger().Fatal(err)
 		}
 
-		dbPath, err := config.DBPath()
+		db, err := openDB()
 		if err != nil {
 			log.Logger().Fatal(err)
 		}
-		db, err := storage.NewRepository(dbPath)
-		if err != nil {
-			log.Logger().Fatal(err)
-		}
-
-		defer func() {
-			if closeErr := db.Close(); closeErr != nil {
-				log.Logger().Println(closeErr)
-			}
-		}()
+		defer closeDB(db)
 
 		if err := db.Write([]byte(text)); err != nil {
 			log.Logger().Fatal(err)

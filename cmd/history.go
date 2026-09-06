@@ -13,7 +13,6 @@ import (
 	"github.com/kaliv0/homie/internal/config"
 	"github.com/kaliv0/homie/internal/finder"
 	"github.com/kaliv0/homie/internal/log"
-	"github.com/kaliv0/homie/internal/storage"
 )
 
 var (
@@ -54,23 +53,13 @@ var (
 		Short:                 "Clear clipboard history",
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, _ []string) {
-			dbPath, err := config.DBPath()
+			db, err := openDB()
 			if err != nil {
 				log.Logger().Fatal(err)
 			}
-			db, err := storage.NewRepository(dbPath)
-			if err != nil {
-				log.Logger().Fatal(err)
-			}
-
-			defer func() {
-				if closeErr := db.Close(); closeErr != nil {
-					log.Logger().Println(closeErr)
-				}
-			}()
+			defer closeDB(db)
 
 			if err := db.Reset(); err != nil {
-				_ = db.Close()
 				log.Logger().Fatal(err)
 			}
 		},
@@ -78,11 +67,12 @@ var (
 )
 
 func fetchDisplayHistory(limit int) (string, error) {
-	dbPath, err := config.DBPath()
+	db, err := openDB()
 	if err != nil {
 		return "", err
 	}
-	return finder.ListHistory(dbPath, limit)
+	defer closeDB(db)
+	return finder.ListHistory(db, limit)
 }
 
 func pasteText(text string) error {

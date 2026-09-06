@@ -121,19 +121,11 @@ func runProcess(cfg *config.Config) error {
 		}
 	}()
 
-	dbPath, err := config.DBPath()
+	db, err := openDB()
 	if err != nil {
 		return err
 	}
-	db, err := storage.NewRepository(dbPath)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if closeErr := db.Close(); closeErr != nil {
-			log.Logger().Println(closeErr)
-		}
-	}()
+	defer closeDB(db)
 
 	if err := db.AutoMigrate(); err != nil {
 		return err

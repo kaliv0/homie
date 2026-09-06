@@ -129,7 +129,9 @@ func findItemIdxs(s *session, loadMore chan struct{}) ([]int, error) {
 				}
 				return ""
 			}
-			// return string to display in previewWindow
+			// WithHotReloadLock covers itemFunc only -> preview must RLock itself
+			s.mu.RLock()
+			defer s.mu.RUnlock()
 			return s.history[i].ClipText
 		}),
 		// reloads passed history slice automatically when items appended

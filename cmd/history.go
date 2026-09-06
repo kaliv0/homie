@@ -21,30 +21,28 @@ var (
 		Short: "List clipboard history",
 		Long: `List clipboard history
   Use <tab> to pin and select multiple entries`,
-		Run: func(cmd *cobra.Command, _ []string) {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			output, err := fetchDisplayHistory(cfg.Limit)
 			if err != nil {
-				log.Logger().Fatal(err)
+				return err
 			}
 			if len(output) == 0 {
-				return
+				return nil
 			}
 
 			if err = clipboard.WriteSelection(output); err != nil {
-				log.Logger().Fatal(err)
+				return err
 			}
 
 			shouldPaste, err := cmd.Flags().GetBool("paste")
 			if err != nil {
-				log.Logger().Fatalf("failed to get 'paste' flag: %v", err)
+				return fmt.Errorf("failed to get 'paste' flag: %w", err)
 			}
 
 			if !shouldPaste {
-				return
+				return nil
 			}
-			if err := pasteText(output); err != nil {
-				log.Logger().Fatal(err)
-			}
+			return pasteText(output)
 		},
 	}
 
@@ -52,16 +50,14 @@ var (
 		Use:                   "clear",
 		Short:                 "Clear clipboard history",
 		DisableFlagsInUseLine: true,
-		Run: func(cmd *cobra.Command, _ []string) {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			db, err := openDB()
 			if err != nil {
-				log.Logger().Fatal(err)
+				return err
 			}
 			defer closeDB(db)
 
-			if err := db.Reset(); err != nil {
-				log.Logger().Fatal(err)
-			}
+			return db.Reset()
 		},
 	}
 )

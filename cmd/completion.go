@@ -1,11 +1,10 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
-
-	"github.com/kaliv0/homie/internal/log"
 )
 
 var (
@@ -15,10 +14,11 @@ var (
 		Long: `To load completions execute:
 $ source <(homie completion | tee -a "$HOME/.bash_completion")`,
 		DisableFlagsInUseLine: true,
-		Run: func(cmd *cobra.Command, _ []string) {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			if err := cmd.Root().GenBashCompletion(os.Stdout); err != nil {
-				log.Logger().Fatalf("failed to generate bash completion: %v", err)
+				return fmt.Errorf("failed to generate bash completion: %w", err)
 			}
+			return nil
 		},
 	}
 )

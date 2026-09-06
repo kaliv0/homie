@@ -1,6 +1,9 @@
 package cmd
 
 import (
+	"fmt"
+	"runtime"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -16,6 +19,10 @@ var rootCmd = &cobra.Command{
 	SilenceErrors: true,
 	SilenceUsage:  true,
 	PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+		if runtime.GOOS != "linux" {
+			return fmt.Errorf("homie requires Linux (running on %s)", runtime.GOOS)
+		}
+
 		if err := config.ReadConfig(); err != nil {
 			return err
 		}

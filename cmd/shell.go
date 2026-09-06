@@ -17,9 +17,10 @@ var (
 		Long: `To enable shell integration execute:
 $ source <(homie shell | tee -a "$HOME/.bashrc")`,
 		DisableFlagsInUseLine: true,
-		Run: func(cmd *cobra.Command, _ []string) {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			cmd.SetOut(os.Stdout)
 			cmd.Println(bashConfig)
+			return nil
 		},
 	}
 )

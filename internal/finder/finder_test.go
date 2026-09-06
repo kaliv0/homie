@@ -32,10 +32,6 @@ func (m *mockReader) Count() (int, error) {
 	return 0, nil
 }
 
-func (m *mockReader) Close() error {
-	return nil
-}
-
 func newMockReader(pages map[int][]storage.ClipboardItem, readErr error) *mockReader {
 	return &mockReader{
 		pages:     pages,

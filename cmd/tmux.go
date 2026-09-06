@@ -21,9 +21,10 @@ $ tmux source-file "$HOME/.tmux.conf"
 
 Requires tmux 3.2+ (for display-popup)`,
 	DisableFlagsInUseLine: true,
-	Run: func(cmd *cobra.Command, _ []string) {
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		cmd.SetOut(os.Stdout)
 		cmd.Println(tmuxConfig)
+		return nil
 	},
 }
 

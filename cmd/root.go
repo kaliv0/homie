@@ -1,6 +1,9 @@
 package cmd
 
 import (
+	"fmt"
+	"runtime"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -11,9 +14,15 @@ import (
 var cfg *config.Config
 
 var rootCmd = &cobra.Command{
-	Use:   "homie",
-	Short: "Terminal-based clipboard manager",
+	Use:           "homie",
+	Short:         "Terminal-based clipboard manager",
+	SilenceErrors: true,
+	SilenceUsage:  true,
 	PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+		if runtime.GOOS != "linux" {
+			return fmt.Errorf("homie requires Linux (running on %s)", runtime.GOOS)
+		}
+
 		if err := config.ReadConfig(); err != nil {
 			return err
 		}
@@ -50,7 +59,9 @@ var rootCmd = &cobra.Command{
 		⠻⠿⢿⣿⣿⣿⣿⠏⠉⠉⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠢⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 `}
 
-// Execute runs the root cobra command.
-func Execute() error {
-	return rootCmd.Execute()
+// Execute runs the root cobra command. Fatal stays here so RunE handlers can return errors.
+func Execute() {
+	if err := rootCmd.Execute(); err != nil {
+		log.Logger().Fatal(err)
+	}
 }

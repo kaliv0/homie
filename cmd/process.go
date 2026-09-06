@@ -2,9 +2,7 @@ package cmd
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"os"
 	"os/signal"
 	"syscall"
 
@@ -23,21 +21,24 @@ var (
 		Use:                   "start",
 		Short:                 "Start clipboard manager",
 		DisableFlagsInUseLine: true,
-		Run: func(cmd *cobra.Command, _ []string) {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			running, _, err := daemon.Status(cfg)
 			if err != nil {
-				log.Logger().Fatal(err)
+				return err
 			}
 			if running {
 				if log.Verbose() {
 					log.Logger().Println("homie daemon is already running")
 				}
-				return
+				return nil
 			}
-			spawnDaemon(cmd)
+			if err := spawnDaemon(cmd); err != nil {
+				return err
+			}
 			if log.Verbose() {
 				log.Logger().Println("homie daemon started")
 			}
+			return nil
 		},
 	}
 
@@ -45,30 +46,25 @@ var (
 		Use:                   "restart",
 		Short:                 "Restart clipboard manager",
 		DisableFlagsInUseLine: true,
-		Run: func(cmd *cobra.Command, _ []string) {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			if err := daemon.Stop(cfg); err != nil {
-				log.Logger().Fatal(err)
+				return err
 			}
-			spawnDaemon(cmd)
+			if err := spawnDaemon(cmd); err != nil {
+				return err
+			}
 			if log.Verbose() {
 				log.Logger().Println("homie daemon restarted")
 			}
+			return nil
 		},
 	}
 
 	runCmd = &cobra.Command{
 		Use:    "run",
 		Hidden: true,
-		Run: func(_ *cobra.Command, _ []string) {
-			if err := runProcess(cfg); err != nil {
-				if errors.Is(err, daemon.ErrAlreadyRunning) {
-					if log.Verbose() {
-						log.Logger().Println("homie daemon is already running")
-					}
-					os.Exit(1)
-				}
-				log.Logger().Fatal(err)
-			}
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return runProcess(cfg)
 		},
 	}
 
@@ -76,13 +72,14 @@ var (
 		Use:                   "stop",
 		Short:                 "Stop clipboard manager",
 		DisableFlagsInUseLine: true,
-		Run: func(cmd *cobra.Command, _ []string) {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			if err := daemon.Stop(cfg); err != nil {
-				log.Logger().Fatal(err)
+				return err
 			}
 			if log.Verbose() {
 				log.Logger().Println("homie daemon stopped")
 			}
+			return nil
 		},
 	}
 
@@ -90,24 +87,23 @@ var (
 		Use:                   "status",
 		Short:                 "Show clipboard manager daemon status",
 		DisableFlagsInUseLine: true,
-		Run: func(cmd *cobra.Command, _ []string) {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			running, pid, err := daemon.Status(cfg)
 			if err != nil {
-				log.Logger().Fatal(err)
+				return err
 			}
 			if running {
 				fmt.Printf("running (pid %d)\n", pid)
-				return
+				return nil
 			}
 			fmt.Println("not running")
+			return nil
 		},
 	}
 )
 
-func spawnDaemon(cmd *cobra.Command) {
-	if err := daemon.Start(cfg, cmd.Root().Name(), "run"); err != nil {
-		log.Logger().Fatal(err)
-	}
+func spawnDaemon(cmd *cobra.Command) error {
+	return daemon.Start(cfg, cmd.Root().Name(), "run")
 }
 
 func runProcess(cfg *config.Config) error {
@@ -121,19 +117,11 @@ func runProcess(cfg *config.Config) error {
 		}
 	}()
 
-	dbPath, err := config.DBPath()
+	db, err := openDB()
 	if err != nil {
 		return err
 	}
-	db, err := storage.NewRepository(dbPath)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if closeErr := db.Close(); closeErr != nil {
-			log.Logger().Println(closeErr)
-		}
-	}()
+	defer closeDB(db)
 
 	if err := db.AutoMigrate(); err != nil {
 		return err

@@ -15,7 +15,6 @@ import (
 type HistoryReader interface {
 	Read(offset, limit int) ([]storage.ClipboardItem, error)
 	Count() (int, error)
-	Close() error
 }
 
 const prompt = "D'OH >> "
@@ -26,20 +25,8 @@ type session struct {
 }
 
 // ListHistory loads clipboard history and presents a fuzzy finder.
-func ListHistory(dbPath string, limit int) (string, error) {
-	// load history
-	db, err := storage.NewRepository(dbPath)
-	if err != nil {
-		return "", err
-	}
-
-	defer func() {
-		if closeErr := db.Close(); closeErr != nil {
-			log.Logger().Println(closeErr)
-		}
-	}()
-
-	// display & search
+// Caller owns db open/close. ListHistory stops pagination before return -> safe to Close after.
+func ListHistory(db HistoryReader, limit int) (string, error) {
 	offset := 0
 	history, err := db.Read(offset, limit)
 	if err != nil {
@@ -52,7 +39,7 @@ func ListHistory(dbPath string, limit int) (string, error) {
 
 	s := &session{history: history}
 
-	// stop the pagination goroutine before db.Close() so an in-flight db.Read()
+	// stop the pagination goroutine before the caller closes db so an in-flight db.Read()
 	// isn't interrupted by a closed connection.
 	var (
 		wg   sync.WaitGroup
@@ -129,7 +116,9 @@ func findItemIdxs(s *session, loadMore chan struct{}) ([]int, error) {
 				}
 				return ""
 			}
-			// return string to display in previewWindow
+			// WithHotReloadLock covers itemFunc only -> preview must RLock itself
+			s.mu.RLock()
+			defer s.mu.RUnlock()
 			return s.history[i].ClipText
 		}),
 		// reloads passed history slice automatically when items appended

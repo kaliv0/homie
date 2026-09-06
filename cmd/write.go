@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -8,47 +9,35 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/kaliv0/homie/internal/clipboard"
-	"github.com/kaliv0/homie/internal/config"
-	"github.com/kaliv0/homie/internal/log"
-	"github.com/kaliv0/homie/internal/storage"
 )
 
 // used as a workaround to enable copying inside tmux session
 var writeCmd = &cobra.Command{
 	Use:    "write",
 	Hidden: true,
-	Run: func(cmd *cobra.Command, _ []string) {
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		data, err := io.ReadAll(os.Stdin)
 		if err != nil {
-			log.Logger().Fatalf("failed to read stdin: %v", err)
+			return fmt.Errorf("failed to read stdin: %w", err)
 		}
+		// tmux copy-pipe appends a trailing newline -> strip it before persist
 		text := strings.TrimRight(string(data), "\n")
-		if text == "" {
-			return
+		// check if we need to persist at all
+		if strings.TrimSpace(text) == "" {
+			return nil
 		}
 
 		if err := clipboard.WriteSelection(text); err != nil {
-			log.Logger().Fatal(err)
+			return err
 		}
 
-		dbPath, err := config.DBPath()
+		db, err := openDB()
 		if err != nil {
-			log.Logger().Fatal(err)
+			return err
 		}
-		db, err := storage.NewRepository(dbPath)
-		if err != nil {
-			log.Logger().Fatal(err)
-		}
+		defer closeDB(db)
 
-		defer func() {
-			if closeErr := db.Close(); closeErr != nil {
-				log.Logger().Println(closeErr)
-			}
-		}()
-
-		if err := db.Write([]byte(text)); err != nil {
-			log.Logger().Fatal(err)
-		}
+		return db.Write([]byte(text))
 	},
 }
 

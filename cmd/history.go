@@ -13,7 +13,6 @@ import (
 	"github.com/kaliv0/homie/internal/config"
 	"github.com/kaliv0/homie/internal/finder"
 	"github.com/kaliv0/homie/internal/log"
-	"github.com/kaliv0/homie/internal/storage"
 )
 
 var (
@@ -22,30 +21,28 @@ var (
 		Short: "List clipboard history",
 		Long: `List clipboard history
   Use <tab> to pin and select multiple entries`,
-		Run: func(cmd *cobra.Command, _ []string) {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			output, err := fetchDisplayHistory(cfg.Limit)
 			if err != nil {
-				log.Logger().Fatal(err)
+				return err
 			}
 			if len(output) == 0 {
-				return
+				return nil
 			}
 
 			if err = clipboard.WriteSelection(output); err != nil {
-				log.Logger().Fatal(err)
+				return err
 			}
 
 			shouldPaste, err := cmd.Flags().GetBool("paste")
 			if err != nil {
-				log.Logger().Fatalf("failed to get 'paste' flag: %v", err)
+				return fmt.Errorf("failed to get 'paste' flag: %w", err)
 			}
 
 			if !shouldPaste {
-				return
+				return nil
 			}
-			if err := pasteText(output); err != nil {
-				log.Logger().Fatal(err)
-			}
+			return pasteText(output)
 		},
 	}
 
@@ -53,36 +50,25 @@ var (
 		Use:                   "clear",
 		Short:                 "Clear clipboard history",
 		DisableFlagsInUseLine: true,
-		Run: func(cmd *cobra.Command, _ []string) {
-			dbPath, err := config.DBPath()
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			db, err := openDB()
 			if err != nil {
-				log.Logger().Fatal(err)
+				return err
 			}
-			db, err := storage.NewRepository(dbPath)
-			if err != nil {
-				log.Logger().Fatal(err)
-			}
+			defer closeDB(db)
 
-			defer func() {
-				if closeErr := db.Close(); closeErr != nil {
-					log.Logger().Println(closeErr)
-				}
-			}()
-
-			if err := db.Reset(); err != nil {
-				_ = db.Close()
-				log.Logger().Fatal(err)
-			}
+			return db.Reset()
 		},
 	}
 )
 
 func fetchDisplayHistory(limit int) (string, error) {
-	dbPath, err := config.DBPath()
+	db, err := openDB()
 	if err != nil {
 		return "", err
 	}
-	return finder.ListHistory(dbPath, limit)
+	defer closeDB(db)
+	return finder.ListHistory(db, limit)
 }
 
 func pasteText(text string) error {

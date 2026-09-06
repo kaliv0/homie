@@ -20,8 +20,10 @@ var writeCmd = &cobra.Command{
 		if err != nil {
 			log.Logger().Fatalf("failed to read stdin: %v", err)
 		}
+		// tmux copy-pipe appends a trailing newline -> strip it before persist
 		text := strings.TrimRight(string(data), "\n")
-		if text == "" {
+		// check if we need to persist at all
+		if strings.TrimSpace(text) == "" {
 			return
 		}
 

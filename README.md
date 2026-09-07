@@ -65,17 +65,18 @@ Deletes all items from the `homie.db` store
 ## External configuration
 
 ```shell
-homie shell
+homie shell [bash|zsh]
 ```
 
-Generates a shell configuration for your `.bashrc` that will start the application automatically<br>
-as well add extra key bindings for opening the preview window.
+Generates a shell configuration for your `.bashrc` / `.zshrc` that will start the application automatically<br>
+and will add extra key bindings for opening the preview window.
 
 ```shell
-homie completion
+echo 'source <(homie completion bash)' >> ~/.bashrc
+echo 'source <(homie completion zsh)' >> ~/.zshrc
 ```
 
-Generates a shell configuration for the `.bash_completion` file that will enable auto_complete for all <i>homie</i> commands<br>
+Generates shell completions for bash or zsh for all <i>homie</i> commands.
 
 ```shell
 homie tmux
@@ -100,13 +101,13 @@ After that it will scan the database and if there are records above certain limi
 - <i>Ctrl + h</i> (<i>prefix + h</i> if inside a tmux session) - opens clipboard history popup (copies selection to system clipboard)
 - <i>Ctrl + p</i> (<i>prefix + p</i>) - opens clipboard history popup and pastes selected item
 
-You can tweak and customize those in your `.bashrc` and `.tmux.conf` files.
+You can tweak and customize those in your `.bashrc`, `.zshrc`, and `.tmux.conf` files.
 
 ---
 
 ## Known limitations
 
-Currently <i>homie</i> is designed for `bash` and `tmux` only.<br>
+Currently <i>homie</i> supports Linux (with X11 or Wayland) and macOS. Shell key bindings work with `bash`, `zsh`, and `tmux`.<br>
 
 <p align="center">
   <img src="https://github.com/kaliv0/homie/blob/main/assets/doh.gif?raw=true" width="300" alt="D'OH">

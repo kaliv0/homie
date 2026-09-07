@@ -15,9 +15,10 @@ homie status
 
 Resolved in order:
 
-1.`pid_file` in `~/.homierc`
-2`$XDG_RUNTIME_DIR/homie.pid`
-3`/run/user/$UID/homie.pid`
+1. `pid_file` in `~/.homierc`
+2. `$XDG_RUNTIME_DIR/homie.pid`
+3. Linux: `/run/user/$UID/homie.pid`
+4. macOS: `$TMPDIR/homie.pid` (system temp dir)
 
 ### Options
 

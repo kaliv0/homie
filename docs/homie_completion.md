@@ -5,10 +5,19 @@ Generate completion script
 ### Synopsis
 
 To load completions execute:
-$ source <(homie completion | tee -a "$HOME/.bash_completion")
+
+bash:
+echo 'source <(homie completion bash)' >> ~/.bashrc
+
+zsh:
+echo 'source <(homie completion zsh)' >> ~/.zshrc
+
+Then reload your shell.
+
+(On macOS bash, ensure ~/.bash_profile sources ~/.bashrc.)
 
 ```
-homie completion
+homie completion [bash|zsh]
 ```
 
 ### Options

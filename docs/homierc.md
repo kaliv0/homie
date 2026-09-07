@@ -16,7 +16,7 @@ Example: [examples/.homierc](../examples/.homierc)
 Related paths (not set in `.homierc`):
 
 - Database: `$XDG_CONFIG_HOME/homie/homie.db` or `~/.config/homie/homie.db`
-- PID file (default): `$XDG_RUNTIME_DIR/homie.pid`
+- PID file (default): `$XDG_RUNTIME_DIR/homie.pid` (Linux fallback: `/run/user/$UID/`, macOS fallback: $TMPDIR)
 
 ### Options
 

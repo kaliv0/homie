@@ -19,8 +19,10 @@ var rootCmd = &cobra.Command{
 	SilenceErrors: true,
 	SilenceUsage:  true,
 	PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
-		if runtime.GOOS != "linux" {
-			return fmt.Errorf("homie requires Linux (running on %s)", runtime.GOOS)
+		switch runtime.GOOS {
+		case "linux", "darwin":
+		default:
+			return fmt.Errorf("homie requires Linux or macOS (running on %s)", runtime.GOOS)
 		}
 
 		if err := config.ReadConfig(); err != nil {

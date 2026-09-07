@@ -2,9 +2,11 @@ package config
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -227,6 +229,32 @@ func TestParse(t *testing.T) {
 		want := filepath.Join(tmpDir, "runtime", pidFileName)
 		if cfg.PIDFile != want {
 			t.Errorf("PIDFile = %q, want %q", cfg.PIDFile, want)
+		}
+	})
+}
+
+func TestResolvePIDFileDefault_fallbacks(t *testing.T) {
+	t.Setenv("XDG_RUNTIME_DIR", "")
+
+	t.Run("linux without XDG_RUNTIME_DIR", func(t *testing.T) {
+		if runtime.GOOS != "linux" {
+			t.Skip("linux-only fallback")
+		}
+		cfg := Parse(viperFromYAML(t, ""))
+		want := filepath.Join(runDir, fmt.Sprintf("%d", os.Getuid()), pidFileName)
+		if cfg.PIDFile != want {
+			t.Fatalf("PIDFile = %q, want %q", cfg.PIDFile, want)
+		}
+	})
+
+	t.Run("darwin without XDG_RUNTIME_DIR", func(t *testing.T) {
+		if runtime.GOOS != "darwin" {
+			t.Skip("darwin-only fallback")
+		}
+		cfg := Parse(viperFromYAML(t, ""))
+		want := filepath.Join(os.TempDir(), pidFileName)
+		if cfg.PIDFile != want {
+			t.Fatalf("PIDFile = %q, want %q", cfg.PIDFile, want)
 		}
 	})
 }

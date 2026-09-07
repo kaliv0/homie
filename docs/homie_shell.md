@@ -5,10 +5,19 @@ Generate a shell integration script
 ### Synopsis
 
 To enable shell integration execute:
-$ source <(homie shell | tee -a "$HOME/.bashrc")
+
+bash:
+echo 'source <(homie shell bash)' >> ~/.bashrc
+
+zsh:
+echo 'source <(homie shell zsh)' >> ~/.zshrc
+
+Then reload your shell.
+
+(On macOS bash, ensure ~/.bash_profile sources ~/.bashrc.)
 
 ```
-homie shell
+homie shell [bash|zsh]
 ```
 
 ### Options

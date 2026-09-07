@@ -51,7 +51,7 @@ func Configure(isVerbose bool, filePath string) {
 		out = os.Stderr
 	}
 
-	flag := log.Lshortfile
+	flag := 0
 	if isVerbose {
 		flag = log.Llongfile
 	}

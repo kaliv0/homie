@@ -51,6 +51,22 @@ func waitForReads(t *testing.T, calls <-chan struct{}, n int) {
 	}
 }
 
+// waitForHistoryLen waits until append finished -> Read may signal before history updates.
+func waitForHistoryLen(t *testing.T, f *loadChannelFixture, want int) {
+	t.Helper()
+	deadline := time.After(time.Second)
+	for {
+		if n := f.historyLen(); n == want {
+			return
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("timed out waiting for history len %d (got %d)", want, f.historyLen())
+		case <-time.After(time.Millisecond):
+		}
+	}
+}
+
 func assertNoRead(t *testing.T, calls <-chan struct{}) {
 	t.Helper()
 	select {
@@ -100,15 +116,11 @@ func TestHandleLoadChannel_LoadsPages(t *testing.T) {
 
 	f.loadMore <- struct{}{}
 	waitForReads(t, reader.readCalls, 1)
-	if n := f.historyLen(); n != 3 {
-		t.Errorf("after page 2: expected 3 items, got %d", n)
-	}
+	waitForHistoryLen(t, f, 3)
 
 	f.loadMore <- struct{}{}
 	waitForReads(t, reader.readCalls, 1)
-	if n := f.historyLen(); n != 4 {
-		t.Errorf("after page 3: expected 4 items, got %d", n)
-	}
+	waitForHistoryLen(t, f, 4)
 
 	// next offset would be 15 == total -> no Read
 	f.loadMore <- struct{}{}
@@ -198,10 +210,7 @@ func TestHandleLoadChannel_Limits(t *testing.T) {
 				assertNoRead(t, reader.readCalls)
 			} else {
 				waitForReads(t, reader.readCalls, tt.signals)
-			}
-
-			if n := f.historyLen(); n != tt.wantLen {
-				t.Errorf("expected history len %d, got %d", tt.wantLen, n)
+				waitForHistoryLen(t, f, tt.wantLen)
 			}
 		})
 	}

@@ -4,4 +4,4 @@ ttl: 7                               # retention period in days
 #threshold: 500                      # cleanup triggers when stored records exceed this
 #verbose: true                       # diagnostic messages to stderr (and log file when teeing)
 #log_file: ~/.local/state/homie.log  # append logs here (file permissions -> 0o600)
-#pid_file: ~/.local/state/homie.pid  # daemon pidfile (default -> $XDG_RUNTIME_DIR/homie.pid)
+#pid_file: ~/.local/state/homie.pid  # daemon pidfile (default -> $XDG_RUNTIME_DIR/homie.pid, macOS -> $TMPDIR)

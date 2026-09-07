@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -115,7 +116,7 @@ func (c *Config) resolvePIDFileDefault() {
 	if xdg := os.Getenv(xdgRuntime); xdg != "" {
 		c.PIDFile = filepath.Join(xdg, pidFileName)
 	} else if runtime.GOOS == "linux" {
-		c.PIDFile = filepath.Join(runDir, fmt.Sprintf("%d", os.Getuid()), pidFileName)
+		c.PIDFile = filepath.Join(runDir, strconv.Itoa(os.Getuid()), pidFileName)
 	} else {
 		c.PIDFile = filepath.Join(os.TempDir(), pidFileName)
 	}

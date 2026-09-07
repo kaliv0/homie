@@ -49,8 +49,10 @@ Then reload your shell.`,
 )
 
 func requireShellArg(_ *cobra.Command, args []string) error {
-	if len(args) != 1 {
+	if len(args) == 0 {
 		return fmt.Errorf("shell required: bash or zsh")
+	} else if len(args) > 1 {
+		return fmt.Errorf("only single argument required")
 	}
 	return nil
 }

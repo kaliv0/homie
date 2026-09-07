@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 
@@ -113,9 +114,11 @@ func (c *Config) resolvePaths() {
 func (c *Config) resolvePIDFileDefault() {
 	if xdg := os.Getenv(xdgRuntime); xdg != "" {
 		c.PIDFile = filepath.Join(xdg, pidFileName)
-		return
+	} else if runtime.GOOS == "linux" {
+		c.PIDFile = filepath.Join(runDir, fmt.Sprintf("%d", os.Getuid()), pidFileName)
+	} else {
+		c.PIDFile = filepath.Join(os.TempDir(), pidFileName)
 	}
-	c.PIDFile = filepath.Join(runDir, fmt.Sprintf("%d", os.Getuid()), pidFileName)
 }
 
 func expandHomePath(p string) string {

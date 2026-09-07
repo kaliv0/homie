@@ -1,0 +1,21 @@
+###  Homie config  ###
+homie start
+
+__homie_history() {
+    local output
+    output=$(homie history)
+    LBUFFER="${LBUFFER}${output}"
+}
+
+__homie_history_paste() {
+    local output
+    output=$(homie history --paste)
+    LBUFFER="${LBUFFER}${output}"
+}
+
+zle -N __homie_history
+zle -N __homie_history_paste
+
+# NB: ^H might conflict with traditional backspace mapping -> change to whatever you like
+bindkey '^H' __homie_history
+bindkey '^P' __homie_history_paste

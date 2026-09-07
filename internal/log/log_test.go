@@ -24,7 +24,7 @@ func restoreDefaultLogger() {
 		logPath = ""
 	}
 	verbose = false
-	std = stdlog.New(os.Stderr, logPrefix, stdlog.Lshortfile)
+	std = stdlog.New(os.Stderr, logPrefix, 0)
 }
 
 func TestConfigureVerbose(t *testing.T) {
@@ -54,7 +54,7 @@ func TestConfigureLogFile(t *testing.T) {
 	}
 	got := string(data)
 	if !strings.Contains(got, "D'OH: ") || !strings.Contains(got, "info-line") {
-		t.Fatalf("log file contents = %q, want homie: prefix, file:line, and message", got)
+		t.Fatalf("log file contents = %q, want D'OH: prefix and message", got)
 	}
 
 	if runtime.GOOS != "windows" {
@@ -106,42 +106,45 @@ func TestConfigure_TeeToFile(t *testing.T) {
 func TestConfigure_FileFlags(t *testing.T) {
 	resetLog(t)
 
-	tests := []struct {
-		name      string
-		verbose   bool
-		wantSlash bool
-	}{
-		{name: "shortfile when not verbose", verbose: false, wantSlash: false},
-		{name: "longfile when verbose", verbose: true, wantSlash: true},
-	}
+	t.Run("no call site when not verbose", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "homie.log")
+		Configure(false, path)
+		Logger().Print("marker")
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			path := filepath.Join(t.TempDir(), "homie.log")
-			Configure(tt.verbose, path)
-			Logger().Print("marker")
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := string(data)
+		if got != logPrefix+"marker\n" {
+			t.Fatalf("log = %q, want %q", got, logPrefix+"marker\n")
+		}
+	})
 
-			data, err := os.ReadFile(path)
-			if err != nil {
-				t.Fatal(err)
-			}
-			got := string(data)
+	t.Run("longfile when verbose", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "homie.log")
+		Configure(true, path)
+		Logger().Print("marker")
 
-			rest, ok := strings.CutPrefix(got, logPrefix)
-			if !ok {
-				t.Fatalf("log = %q, want prefix %q", got, logPrefix)
-			}
-			site, _, ok := strings.Cut(rest, ": marker")
-			if !ok {
-				t.Fatalf("log = %q, want file:line before marker", got)
-			}
-			if !strings.Contains(site, "log_test.go") {
-				t.Fatalf("call site %q, want log_test.go", site)
-			}
-			hasSlash := strings.ContainsRune(site, filepath.Separator)
-			if hasSlash != tt.wantSlash {
-				t.Fatalf("call site %q: has path separator = %v, want %v", site, hasSlash, tt.wantSlash)
-			}
-		})
-	}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := string(data)
+
+		rest, ok := strings.CutPrefix(got, logPrefix)
+		if !ok {
+			t.Fatalf("log = %q, want prefix %q", got, logPrefix)
+		}
+		site, _, ok := strings.Cut(rest, ": marker")
+		if !ok {
+			t.Fatalf("log = %q, want file:line before marker", got)
+		}
+		if !strings.Contains(site, "log_test.go") {
+			t.Fatalf("call site %q, want log_test.go", site)
+		}
+		if !strings.ContainsRune(site, filepath.Separator) {
+			t.Fatalf("call site %q, want path separator for Llongfile", site)
+		}
+	})
 }

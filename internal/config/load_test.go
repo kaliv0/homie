@@ -13,20 +13,10 @@ import (
 	"github.com/spf13/viper"
 )
 
-func applyHomieDefaults(v *viper.Viper) {
-	v.SetDefault(Verbose, false)
-	v.SetDefault(LogFile, "")
-	v.SetDefault(PIDFile, "")
-	v.SetDefault(Limit, DefaultLimit)
-	v.SetDefault(TTL, DefaultTTL)
-	v.SetDefault(Keep, DefaultKeep)
-	v.SetDefault(Threshold, DefaultThreshold)
-}
-
 func viperFromYAML(t *testing.T, yaml string) *viper.Viper {
 	t.Helper()
 	v := viper.New()
-	applyHomieDefaults(v)
+	setDefaults(v)
 	if yaml == "" {
 		return v
 	}

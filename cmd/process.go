@@ -28,7 +28,7 @@ var (
 			}
 			if running {
 				if log.Verbose() {
-					log.Logger().Println("homie daemon is already running")
+					log.Println("homie daemon is already running")
 				}
 				return nil
 			}
@@ -36,7 +36,7 @@ var (
 				return err
 			}
 			if log.Verbose() {
-				log.Logger().Println("homie daemon started")
+				log.Println("homie daemon started")
 			}
 			return nil
 		},
@@ -54,7 +54,7 @@ var (
 				return err
 			}
 			if log.Verbose() {
-				log.Logger().Println("homie daemon restarted")
+				log.Println("homie daemon restarted")
 			}
 			return nil
 		},
@@ -77,7 +77,7 @@ var (
 				return err
 			}
 			if log.Verbose() {
-				log.Logger().Println("homie daemon stopped")
+				log.Println("homie daemon stopped")
 			}
 			return nil
 		},
@@ -113,7 +113,7 @@ func runProcess(cfg *config.Config) error {
 	}
 	defer func() {
 		if releaseErr := lock.Release(); releaseErr != nil {
-			log.Logger().Println(releaseErr)
+			log.Println(releaseErr)
 		}
 	}()
 
@@ -136,7 +136,7 @@ func runProcess(cfg *config.Config) error {
 		Threshold: cfg.Threshold,
 	}
 	if err := storage.CleanOldHistory(db, cleanup); err != nil {
-		log.Logger().Println(err)
+		log.Println(err)
 	}
 
 	// Ignore SIGHUP so the daemon survives terminal/session closure (e.g. tmux exit)

@@ -16,6 +16,6 @@ func openDB() (*storage.Repository, error) {
 
 func closeDB(db *storage.Repository) {
 	if closeErr := db.Close(); closeErr != nil {
-		log.Logger().Println(closeErr)
+		log.Println(closeErr)
 	}
 }

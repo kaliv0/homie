@@ -26,7 +26,7 @@ func testPIDFile(t *testing.T) string {
 
 func writePIDFile(t *testing.T, path string, pid int) {
 	t.Helper()
-	if err := os.WriteFile(path, []byte(fmt.Sprintf("%d\n", pid)), 0600); err != nil {
+	if err := os.WriteFile(path, fmt.Appendf(nil,"%d\n", pid), 0600); err != nil {
 		t.Fatalf("failed to write pidfile: %v", err)
 	}
 }

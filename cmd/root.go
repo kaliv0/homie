@@ -64,6 +64,6 @@ var rootCmd = &cobra.Command{
 // Execute runs the root cobra command. Fatal stays here so RunE handlers can return errors.
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
-		log.Logger().Fatal(err)
+		log.Fatal(err)
 	}
 }

@@ -27,28 +27,6 @@ func (m *mockReader) Count() (int, error) {
 	return 0, nil
 }
 
-// runLoads sends n signals -> closes the channel -> waits for the loader to drain.
-func runLoads(t *testing.T, r HistoryReader, init []storage.ClipboardItem, offset, limit, total, n int) *session {
-	t.Helper()
-	s := &session{history: slices.Clone(init)}
-	var wg sync.WaitGroup
-	loadMore := handleLoadChannel(s, r, offset, limit, total, &wg)
-	for range n {
-		loadMore <- struct{}{}
-	}
-	close(loadMore)
-	wg.Wait()
-	return s
-}
-
-func initItems(n int) []storage.ClipboardItem {
-	items := make([]storage.ClipboardItem, n)
-	for i := range items {
-		items[i] = storage.ClipboardItem{ID: i + 1, ClipText: "init"}
-	}
-	return items
-}
-
 func TestHandleLoadChannel(t *testing.T) {
 	t.Parallel()
 
@@ -119,7 +97,16 @@ func TestHandleLoadChannel(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			reader := &mockReader{pages: tt.pages, err: tt.err}
-			s := runLoads(t, reader, initItems(tt.initLen), tt.offset, tt.limit, tt.total, tt.signals)
+			s := &session{history: make([]storage.ClipboardItem, tt.initLen)}
+
+			// close + Wait -> loader drains queued signals before we assert
+			var wg sync.WaitGroup
+			loadMore := handleLoadChannel(s, reader, tt.offset, tt.limit, tt.total, &wg)
+			for range tt.signals {
+				loadMore <- struct{}{}
+			}
+			close(loadMore)
+			wg.Wait()
 
 			if reader.calls != tt.wantCalls {
 				t.Errorf("Read calls = %d, want %d", reader.calls, tt.wantCalls)

@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-func setupTestDB(t *testing.T) (*Repository, string) {
+func setupTestDB(t *testing.T) *Repository {
 	t.Helper()
 	dbPath := filepath.Join(t.TempDir(), "test.db")
 
@@ -25,12 +25,6 @@ func setupTestDB(t *testing.T) (*Repository, string) {
 	if err := repo.AutoMigrate(); err != nil {
 		t.Fatalf("AutoMigrate() failed: %v", err)
 	}
-	return repo, dbPath
-}
-
-func newTestRepo(t *testing.T) *Repository {
-	t.Helper()
-	repo, _ := setupTestDB(t)
 	return repo
 }
 
@@ -99,7 +93,7 @@ func assertClipTexts(t *testing.T, items []ClipboardItem, want []string) {
 
 func TestNewRepository(t *testing.T) {
 	t.Parallel()
-	_, dbPath := setupTestDB(t)
+	dbPath := setupTestDB(t).dbPath
 
 	if _, err := os.Stat(dbPath); err != nil {
 		t.Fatalf("expected database file at %q: %v", dbPath, err)
@@ -116,7 +110,7 @@ func TestNewRepository_InvalidPath(t *testing.T) {
 
 func TestAutoMigrate(t *testing.T) {
 	t.Parallel()
-	repo := newTestRepo(t)
+	repo := setupTestDB(t)
 
 	for _, obj := range []struct{ kind, name string }{
 		{"table", "clipboard_items"},
@@ -136,7 +130,8 @@ func TestSetDBFilesPermissions(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip()
 	}
-	repo, dbPath := setupTestDB(t)
+	repo := setupTestDB(t)
+	dbPath := repo.dbPath
 
 	if err := repo.SetDBFilesPermissions(); err != nil {
 		t.Fatalf("SetDBFilesPermissions: %v", err)
@@ -179,7 +174,7 @@ func TestWrite(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			repo := newTestRepo(t)
+			repo := setupTestDB(t)
 			for _, text := range tt.texts {
 				if err := repo.Write([]byte(text)); err != nil {
 					t.Fatalf("Write(%q) failed: %v", text, err)
@@ -194,7 +189,7 @@ func TestWrite(t *testing.T) {
 
 func TestWrite_Deduplication(t *testing.T) {
 	t.Parallel()
-	repo := newTestRepo(t)
+	repo := setupTestDB(t)
 
 	if err := repo.Write([]byte("same")); err != nil {
 		t.Fatalf("first Write() failed: %v", err)
@@ -215,7 +210,7 @@ func TestWrite_Deduplication(t *testing.T) {
 
 func TestWrite_MultipleUniqueItems(t *testing.T) {
 	t.Parallel()
-	repo := newTestRepo(t)
+	repo := setupTestDB(t)
 	for i := range 20 {
 		if err := repo.Write(fmt.Appendf(nil, "item-%d", i)); err != nil {
 			t.Fatalf("Write(item-%d) failed: %v", i, err)
@@ -226,7 +221,7 @@ func TestWrite_MultipleUniqueItems(t *testing.T) {
 
 func TestRead_Ordering(t *testing.T) {
 	t.Parallel()
-	repo := newTestRepo(t)
+	repo := setupTestDB(t)
 	seedItems(t, repo, 3)
 
 	assertClipTexts(t, mustRead(t, repo, 0, 10), []string{"item-2", "item-1", "item-0"})
@@ -252,7 +247,7 @@ func TestRead_Limits(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			repo := newTestRepo(t)
+			repo := setupTestDB(t)
 			seedItems(t, repo, tt.numItems)
 
 			if items := mustRead(t, repo, tt.offset, tt.limit); len(items) != tt.wantLen {
@@ -280,7 +275,7 @@ func TestDeleteExcess(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			repo := newTestRepo(t)
+			repo := setupTestDB(t)
 			seedItems(t, repo, tt.numItems)
 
 			if err := repo.DeleteExcess(tt.deleteCount); err != nil {
@@ -313,7 +308,7 @@ func TestDeleteOldest(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			repo := newTestRepo(t)
+			repo := setupTestDB(t)
 			insertOldItems(t, repo, tt.oldCount, tt.oldDays)
 			seedItems(t, repo, tt.newCount)
 
@@ -327,7 +322,7 @@ func TestDeleteOldest(t *testing.T) {
 
 func TestReset(t *testing.T) {
 	t.Parallel()
-	repo := newTestRepo(t)
+	repo := setupTestDB(t)
 
 	if err := repo.Write([]byte("before-reset")); err != nil {
 		t.Fatalf("Write() failed: %v", err)
@@ -345,7 +340,7 @@ func TestReset(t *testing.T) {
 
 func TestCleanOldHistory_TTL(t *testing.T) {
 	t.Parallel()
-	repo := newTestRepo(t)
+	repo := setupTestDB(t)
 	seedItems(t, repo, 10)
 	insertOldItems(t, repo, 2, 20)
 	// TTL=7 removes only the 2 old items. threshold=5 would trim more but is ignored.
@@ -378,7 +373,7 @@ func TestCleanOldHistory_Threshold(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			repo := newTestRepo(t)
+			repo := setupTestDB(t)
 			seedItems(t, repo, tt.numItems)
 
 			cfg := CleanupConfig{TTL: 0, Threshold: tt.threshold, Keep: tt.keep}

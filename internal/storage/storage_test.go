@@ -1,57 +1,65 @@
 package storage
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 )
 
-func setupTestDB(t *testing.T) *Repository {
+func setupTestDB(t *testing.T) (*Repository, string) {
 	t.Helper()
-	tmpDir := t.TempDir()
-	dbPath := filepath.Join(tmpDir, "test.db")
+	dbPath := filepath.Join(t.TempDir(), "test.db")
 
 	repo, err := NewRepository(dbPath)
 	if err != nil {
 		t.Fatalf("NewRepository(%q) failed: %v", dbPath, err)
 	}
+	t.Cleanup(func() { _ = repo.Close() })
 	if err := repo.AutoMigrate(); err != nil {
 		t.Fatalf("AutoMigrate() failed: %v", err)
 	}
-	t.Cleanup(func() { _ = repo.Close() })
+	return repo, dbPath
+}
+
+func newTestRepo(t *testing.T) *Repository {
+	t.Helper()
+	repo, _ := setupTestDB(t)
 	return repo
 }
 
-// seedItems inserts n unique items with explicit timestamps spaced 1s apart.
+// insertItem inserts a row directly -> bypasses Write so tests control the timestamp.
+func insertItem(t *testing.T, repo *Repository, text string, ts time.Time) {
+	t.Helper()
+	_, err := repo.db.Exec(
+		`INSERT INTO clipboard_items (clip_text, text_hash, time_stamp) VALUES (?, ?, ?)`,
+		text, "hash-"+text, ts)
+	if err != nil {
+		t.Fatalf("insertItem(%q) failed: %v", text, err)
+	}
+}
+
+// seedItems inserts item-0..item-(n-1) with timestamps spaced 1s apart -> item-(n-1) is newest.
 func seedItems(t *testing.T, repo *Repository, n int) {
 	t.Helper()
 	base := time.Now().Add(-time.Duration(n-1) * time.Second)
 	for i := range n {
-		text := fmt.Sprintf("item-%d", i)
-		ts := base.Add(time.Duration(i) * time.Second)
-		_, err := repo.db.Exec(
-			`INSERT INTO clipboard_items (clip_text, text_hash, time_stamp) VALUES (?, ?, ?)`,
-			text, fmt.Sprintf("hash-%d", i), ts)
-		if err != nil {
-			t.Fatalf("seedItems(%d) failed: %v", i, err)
-		}
+		insertItem(t, repo, fmt.Sprintf("item-%d", i), base.Add(time.Duration(i)*time.Second))
 	}
 }
 
-// insertOldItem inserts a clipboard item with a timestamp daysAgo in the past.
-func insertOldItem(t *testing.T, repo *Repository, text, hash string, daysAgo int) {
+// insertOldItems inserts n items with a timestamp daysAgo in the past.
+func insertOldItems(t *testing.T, repo *Repository, n, daysAgo int) {
 	t.Helper()
 	ts := time.Now().Add(-time.Duration(daysAgo) * 24 * time.Hour)
-	_, err := repo.db.Exec(`
-		INSERT INTO clipboard_items (clip_text, text_hash, time_stamp)
-		VALUES (?, ?, ?)
-	`, text, hash, ts)
-	if err != nil {
-		t.Fatalf("insertOldItem(%q) failed: %v", text, err)
+	for i := range n {
+		insertItem(t, repo, fmt.Sprintf("old-%d", i), ts)
 	}
 }
 
@@ -90,21 +98,16 @@ func assertClipTexts(t *testing.T, items []ClipboardItem, want []string) {
 }
 
 func TestNewRepository(t *testing.T) {
-	tmpDir := t.TempDir()
-	dbPath := filepath.Join(tmpDir, "test.db")
+	t.Parallel()
+	_, dbPath := setupTestDB(t)
 
-	repo, err := NewRepository(dbPath)
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	t.Cleanup(func() { _ = repo.Close() })
-
-	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
-		t.Fatalf("expected database file to be created at %q", dbPath)
+	if _, err := os.Stat(dbPath); err != nil {
+		t.Fatalf("expected database file at %q: %v", dbPath, err)
 	}
 }
 
 func TestNewRepository_InvalidPath(t *testing.T) {
+	t.Parallel()
 	_, err := NewRepository("/nonexistent/path/to/db.sqlite")
 	if err == nil {
 		t.Fatal("expected error for invalid path, got nil")
@@ -112,47 +115,39 @@ func TestNewRepository_InvalidPath(t *testing.T) {
 }
 
 func TestAutoMigrate(t *testing.T) {
-	repo := setupTestDB(t)
+	t.Parallel()
+	repo := newTestRepo(t)
 
-	var tableName string
-	err := repo.db.Get(&tableName, `SELECT name FROM sqlite_master WHERE type='table' AND name='clipboard_items'`)
-	if err != nil {
-		t.Fatalf("expected clipboard_items table to exist: %v", err)
-	}
-
-	var indexName string
-	err = repo.db.Get(&indexName, `SELECT name FROM sqlite_master WHERE type='index' AND name='idx_time_stamp'`)
-	if err != nil {
-		t.Fatalf("expected idx_time_stamp index to exist: %v", err)
+	for _, obj := range []struct{ kind, name string }{
+		{"table", "clipboard_items"},
+		{"index", "idx_time_stamp"},
+		{"index", "idx_text_hash"},
+	} {
+		var name string
+		err := repo.db.Get(&name, `SELECT name FROM sqlite_master WHERE type = ? AND name = ?`, obj.kind, obj.name)
+		if err != nil {
+			t.Errorf("expected %s %s to exist: %v", obj.kind, obj.name, err)
+		}
 	}
 }
 
 func TestSetDBFilesPermissions(t *testing.T) {
+	t.Parallel()
 	if runtime.GOOS == "windows" {
 		t.Skip()
 	}
-	tmpDir := t.TempDir()
-	dbPath := filepath.Join(tmpDir, "perm.db")
+	repo, dbPath := setupTestDB(t)
 
-	repo, err := NewRepository(dbPath)
-	if err != nil {
-		t.Fatalf("NewRepository: %v", err)
-	}
-	t.Cleanup(func() { _ = repo.Close() })
-
-	if err := repo.AutoMigrate(); err != nil {
-		t.Fatalf("AutoMigrate: %v", err)
-	}
 	if err := repo.SetDBFilesPermissions(); err != nil {
 		t.Fatalf("SetDBFilesPermissions: %v", err)
 	}
 
 	for _, path := range []string{dbPath, dbPath + "-wal", dbPath + "-shm"} {
 		info, err := os.Stat(path)
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
 		if err != nil {
-			if os.IsNotExist(err) {
-				continue
-			}
 			t.Fatal(err)
 		}
 		if perm := info.Mode().Perm(); perm != 0o600 {
@@ -162,14 +157,14 @@ func TestSetDBFilesPermissions(t *testing.T) {
 }
 
 func TestWrite(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name  string
 		texts []string
-		want  []string
 	}{
-		{"insert", []string{"hello world"}, []string{"hello world"}},
-		{"empty", []string{""}, []string{""}},
-		{"large", []string{strings.Repeat("a", 10000)}, []string{strings.Repeat("a", 10000)}},
+		{"insert", []string{"hello world"}},
+		{"empty", []string{""}},
+		{"large", []string{strings.Repeat("a", 10000)}},
 		{"special characters", []string{
 			"hello\nworld",
 			"tab\there",
@@ -178,54 +173,49 @@ func TestWrite(t *testing.T) {
 			"emoji 🎉",
 			"null\x00byte",
 			"unicode: こんにちは",
-		}, nil}, // count-only via want nil meaning assert all texts
+		}},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			repo := setupTestDB(t)
+			t.Parallel()
+			repo := newTestRepo(t)
 			for _, text := range tt.texts {
 				if err := repo.Write([]byte(text)); err != nil {
 					t.Fatalf("Write(%q) failed: %v", text, err)
 				}
 			}
-			want := tt.want
-			if want == nil {
-				want = tt.texts
-			}
-			// Read is newest-first
-			reversed := make([]string, len(want))
-			for i, w := range want {
-				reversed[len(want)-1-i] = w
-			}
-			assertClipTexts(t, mustRead(t, repo, 0, len(want)+1), reversed)
+			want := slices.Clone(tt.texts)
+			slices.Reverse(want) // Read is newest-first
+			assertClipTexts(t, mustRead(t, repo, 0, len(want)+1), want)
 		})
 	}
 }
 
 func TestWrite_Deduplication(t *testing.T) {
-	repo := setupTestDB(t)
+	t.Parallel()
+	repo := newTestRepo(t)
 
 	if err := repo.Write([]byte("same")); err != nil {
 		t.Fatalf("first Write() failed: %v", err)
 	}
-	items1 := mustRead(t, repo, 0, 10)
-	ts1 := items1[0].TimeStamp
+	ts1 := mustRead(t, repo, 0, 10)[0].TimeStamp
 
 	if err := repo.Write([]byte("same")); err != nil {
 		t.Fatalf("second Write() failed: %v", err)
 	}
-	items2 := mustRead(t, repo, 0, 10)
-	if len(items2) != 1 {
-		t.Fatalf("expected 1 item after dedup, got %d", len(items2))
+	items := mustRead(t, repo, 0, 10)
+	if len(items) != 1 {
+		t.Fatalf("expected 1 item after dedup, got %d", len(items))
 	}
-	if !items2[0].TimeStamp.After(ts1) {
-		t.Errorf("expected updated timestamp to be after original: %v vs %v", items2[0].TimeStamp, ts1)
+	if !items[0].TimeStamp.After(ts1) {
+		t.Errorf("expected updated timestamp to be after original: %v vs %v", items[0].TimeStamp, ts1)
 	}
 }
 
 func TestWrite_MultipleUniqueItems(t *testing.T) {
-	repo := setupTestDB(t)
+	t.Parallel()
+	repo := newTestRepo(t)
 	for i := range 20 {
 		if err := repo.Write(fmt.Appendf(nil, "item-%d", i)); err != nil {
 			t.Fatalf("Write(item-%d) failed: %v", i, err)
@@ -235,13 +225,15 @@ func TestWrite_MultipleUniqueItems(t *testing.T) {
 }
 
 func TestRead_Ordering(t *testing.T) {
-	repo := setupTestDB(t)
+	t.Parallel()
+	repo := newTestRepo(t)
 	seedItems(t, repo, 3)
 
 	assertClipTexts(t, mustRead(t, repo, 0, 10), []string{"item-2", "item-1", "item-0"})
 }
 
 func TestRead_Limits(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		numItems int
@@ -259,11 +251,11 @@ func TestRead_Limits(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			repo := setupTestDB(t)
+			t.Parallel()
+			repo := newTestRepo(t)
 			seedItems(t, repo, tt.numItems)
 
-			items := mustRead(t, repo, tt.offset, tt.limit)
-			if len(items) != tt.wantLen {
+			if items := mustRead(t, repo, tt.offset, tt.limit); len(items) != tt.wantLen {
 				t.Errorf("expected %d items, got %d", tt.wantLen, len(items))
 			}
 		})
@@ -271,6 +263,7 @@ func TestRead_Limits(t *testing.T) {
 }
 
 func TestDeleteExcess(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name        string
 		numItems    int
@@ -286,7 +279,8 @@ func TestDeleteExcess(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			repo := setupTestDB(t)
+			t.Parallel()
+			repo := newTestRepo(t)
 			seedItems(t, repo, tt.numItems)
 
 			if err := repo.DeleteExcess(tt.deleteCount); err != nil {
@@ -301,6 +295,7 @@ func TestDeleteExcess(t *testing.T) {
 }
 
 func TestDeleteOldest(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name      string
 		oldDays   int
@@ -317,11 +312,9 @@ func TestDeleteOldest(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			repo := setupTestDB(t)
-
-			for i := range tt.oldCount {
-				insertOldItem(t, repo, fmt.Sprintf("old-%d", i), fmt.Sprintf("hash-%s-%d", tt.name, i), tt.oldDays)
-			}
+			t.Parallel()
+			repo := newTestRepo(t)
+			insertOldItems(t, repo, tt.oldCount, tt.oldDays)
 			seedItems(t, repo, tt.newCount)
 
 			if err := repo.DeleteOldest(tt.ttl); err != nil {
@@ -333,7 +326,8 @@ func TestDeleteOldest(t *testing.T) {
 }
 
 func TestReset(t *testing.T) {
-	repo := setupTestDB(t)
+	t.Parallel()
+	repo := newTestRepo(t)
 
 	if err := repo.Write([]byte("before-reset")); err != nil {
 		t.Fatalf("Write() failed: %v", err)
@@ -351,10 +345,9 @@ func TestReset(t *testing.T) {
 
 func TestCleanOldHistory_TTL(t *testing.T) {
 	t.Parallel()
-	repo := setupTestDB(t)
+	repo := newTestRepo(t)
 	seedItems(t, repo, 10)
-	insertOldItem(t, repo, "old-0", "oldhash-prec0", 20)
-	insertOldItem(t, repo, "old-1", "oldhash-prec1", 20)
+	insertOldItems(t, repo, 2, 20)
 	// TTL=7 removes only the 2 old items. threshold=5 would trim more but is ignored.
 	cfg := CleanupConfig{TTL: 7, Threshold: 5, Keep: 5}
 	if err := CleanOldHistory(repo, cfg); err != nil {
@@ -385,7 +378,7 @@ func TestCleanOldHistory_Threshold(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			repo := setupTestDB(t)
+			repo := newTestRepo(t)
 			seedItems(t, repo, tt.numItems)
 
 			cfg := CleanupConfig{TTL: 0, Threshold: tt.threshold, Keep: tt.keep}

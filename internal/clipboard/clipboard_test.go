@@ -3,54 +3,37 @@ package clipboard
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 	"time"
 
 	gclip "golang.design/x/clipboard"
 )
 
+var errWrite = errors.New("write failed")
+
+// mockWriter records writes -> returns errWrite on call number failOn (0 means never).
 type mockWriter struct {
-	items [][]byte
-	err   error
+	items  []string
+	calls  int
+	failOn int
 }
 
 func (m *mockWriter) Write(item []byte) error {
-	if m.err != nil {
-		return m.err
+	m.calls++
+	if m.calls == m.failOn {
+		return errWrite
 	}
-	m.items = append(m.items, item)
+	m.items = append(m.items, string(item))
 	return nil
 }
 
-// conditionalMockWriter fails on a specific call number.
-type conditionalMockWriter struct {
-	failOnCall int
-	err        error
-	callCount  int
-}
-
-func (m *conditionalMockWriter) Write(_ []byte) error {
-	m.callCount++
-	if m.callCount == m.failOnCall {
-		return m.err
-	}
-	return nil
-}
-
-// trackClosed sends items to a buffered channel, closes it, and runs TrackClipboard.
-func trackClosed(t *testing.T, writer Writer, items ...gclip.Data) error {
-	t.Helper()
-	ch := make(chan gclip.Data, len(items))
-	for _, item := range items {
-		ch <- item
-	}
-	close(ch)
-
-	return TrackClipboard(t.Context(), writer, ch)
+func text(s string) gclip.Data {
+	return gclip.Data{Format: gclip.FmtText, Bytes: []byte(s)}
 }
 
 // assertTrackClipboardDone waits for TrackClipboard to finish and expects a nil error.
-func assertTrackClipboardDone(t *testing.T, done <-chan error, waitMsg string) {
+func assertTrackClipboardDone(t *testing.T, done <-chan error) {
 	t.Helper()
 	select {
 	case err := <-done:
@@ -58,159 +41,96 @@ func assertTrackClipboardDone(t *testing.T, done <-chan error, waitMsg string) {
 			t.Fatalf("expected nil error, got %v", err)
 		}
 	case <-time.After(time.Second):
-		t.Fatal(waitMsg)
+		t.Fatal("TrackClipboard did not return")
 	}
 }
 
-func TestTrackClipboard_ReceivesItems(t *testing.T) {
-	t.Parallel()
-
-	writer := &mockWriter{}
-	err := trackClosed(t, writer,
-		gclip.Data{Format: gclip.FmtText, Bytes: []byte("item1")},
-		gclip.Data{Format: gclip.FmtText, Bytes: []byte("item2")},
-		gclip.Data{Format: gclip.FmtText, Bytes: []byte("item3")},
-	)
-	if err != nil {
-		t.Fatalf("TrackClipboard() failed: %v", err)
-	}
-
-	if len(writer.items) != 3 {
-		t.Fatalf("expected 3 items written, got %d", len(writer.items))
-	}
-	if string(writer.items[0]) != "item1" {
-		t.Errorf("expected first item=%q, got %q", "item1", writer.items[0])
-	}
-	if string(writer.items[2]) != "item3" {
-		t.Errorf("expected third item=%q, got %q", "item3", writer.items[2])
-	}
-}
-
-func TestTrackClipboard_ContextCancellation(t *testing.T) {
-	t.Parallel()
-	ctx, cancel := context.WithCancel(context.Background())
-
-	ch := make(chan gclip.Data)
-	writer := &mockWriter{}
-
-	done := make(chan error, 1)
-	go func() {
-		done <- TrackClipboard(ctx, writer, ch)
-	}()
-
-	cancel()
-
-	assertTrackClipboardDone(t, done, "TrackClipboard did not return after context cancellation")
-}
-
-func TestTrackClipboard_ChannelClose(t *testing.T) {
-	t.Parallel()
-	ch := make(chan gclip.Data)
-	writer := &mockWriter{}
-
-	done := make(chan error, 1)
-	go func() {
-		done <- TrackClipboard(t.Context(), writer, ch)
-	}()
-
-	close(ch)
-
-	assertTrackClipboardDone(t, done, "TrackClipboard did not return after channel close")
-}
-
-func TestTrackClipboard_WriteError(t *testing.T) {
-	t.Parallel()
-	writeErr := errors.New("write failed")
-	writer := &mockWriter{err: writeErr}
-
-	err := trackClosed(t, writer, gclip.Data{Format: gclip.FmtText, Bytes: []byte("data")})
-	if !errors.Is(err, writeErr) {
-		t.Fatalf("expected write error, got %v", err)
-	}
-}
-
-func TestTrackClipboard_SkipsEmptyItem(t *testing.T) {
+func TestTrackClipboard(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name  string
-		bytes []byte
+		name      string
+		in        []gclip.Data
+		failOn    int
+		want      []string
+		wantErr   bool
+		wantCalls int
 	}{
-		{name: "nil", bytes: nil},
-		{name: "empty", bytes: []byte{}},
-		{name: "spaces", bytes: []byte("   ")},
-		{name: "tabs and newlines", bytes: []byte("\t\n\r ")},
+		{name: "receives items", in: []gclip.Data{text("item1"), text("item2"), text("item3")},
+			want: []string{"item1", "item2", "item3"}, wantCalls: 3},
+		{name: "no items", wantCalls: 0},
+		{name: "skips nil", in: []gclip.Data{{Format: gclip.FmtText}}, wantCalls: 0},
+		{name: "skips empty", in: []gclip.Data{text("")}, wantCalls: 0},
+		{name: "skips spaces", in: []gclip.Data{text("   ")}, wantCalls: 0},
+		{name: "skips tabs and newlines", in: []gclip.Data{text("\t\n\r ")}, wantCalls: 0},
+		{name: "keeps whitespace padded content", in: []gclip.Data{text("  hello  ")},
+			want: []string{"  hello  "}, wantCalls: 1},
+		{name: "empty item stops watch", in: []gclip.Data{text("first"), text("  "), text("after-empty")},
+			want: []string{"first"}, wantCalls: 1},
+		{name: "write error", in: []gclip.Data{text("data")}, failOn: 1,
+			wantErr: true, wantCalls: 1},
+		{name: "write error on second item", in: []gclip.Data{text("first"), text("second"), text("third")}, failOn: 2,
+			want: []string{"first"}, wantErr: true, wantCalls: 2},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			writer := &mockWriter{}
-			err := trackClosed(t, writer, gclip.Data{Format: gclip.FmtText, Bytes: tt.bytes})
-			if err != nil {
+			ch := make(chan gclip.Data, len(tt.in))
+			for _, item := range tt.in {
+				ch <- item
+			}
+			close(ch)
+
+			writer := &mockWriter{failOn: tt.failOn}
+			err := TrackClipboard(t.Context(), writer, ch)
+
+			if tt.wantErr {
+				if !errors.Is(err, errWrite) {
+					t.Fatalf("expected write error, got %v", err)
+				}
+			} else if err != nil {
 				t.Fatalf("TrackClipboard() failed: %v", err)
 			}
-			if len(writer.items) != 0 {
-				t.Fatalf("expected no writes for empty item, got %d", len(writer.items))
+			if writer.calls != tt.wantCalls {
+				t.Errorf("Write calls = %d, want %d", writer.calls, tt.wantCalls)
+			}
+			if !slices.Equal(writer.items, tt.want) {
+				t.Errorf("written = %q, want %q", writer.items, tt.want)
 			}
 		})
 	}
 }
 
-func TestTrackClipboard_KeepsWhitespacePaddedContent(t *testing.T) {
+func TestTrackClipboard_ContextCancellation(t *testing.T) {
 	t.Parallel()
-	writer := &mockWriter{}
-	err := trackClosed(t, writer, gclip.Data{Format: gclip.FmtText, Bytes: []byte("  hello  ")})
-	if err != nil {
-		t.Fatalf("TrackClipboard() failed: %v", err)
-	}
-	if len(writer.items) != 1 {
-		t.Fatalf("expected 1 item, got %d", len(writer.items))
-	}
-	if string(writer.items[0]) != "  hello  " {
-		t.Errorf("got %q, want %q", writer.items[0], "  hello  ")
-	}
+	ctx, cancel := context.WithCancel(t.Context())
+
+	done := make(chan error, 1)
+	go func() {
+		done <- TrackClipboard(ctx, &mockWriter{}, make(chan gclip.Data))
+	}()
+
+	cancel()
+	assertTrackClipboardDone(t, done)
 }
 
-func TestTrackClipboard_EmptyItemStopsWatch(t *testing.T) {
+func TestTrackClipboard_ChannelClose(t *testing.T) {
 	t.Parallel()
-	writer := &mockWriter{}
-	err := trackClosed(t, writer,
-		gclip.Data{Format: gclip.FmtText, Bytes: []byte("first")},
-		gclip.Data{Format: gclip.FmtText, Bytes: []byte("  ")},
-		gclip.Data{Format: gclip.FmtText, Bytes: []byte("after-empty")},
-	)
-	if err != nil {
-		t.Fatalf("TrackClipboard() failed: %v", err)
-	}
-	if len(writer.items) != 1 {
-		t.Fatalf("expected 1 item before empty stop, got %d", len(writer.items))
-	}
-	if string(writer.items[0]) != "first" {
-		t.Errorf("got %q, want %q", writer.items[0], "first")
-	}
-}
+	ch := make(chan gclip.Data)
 
-func TestTrackClipboard_WriteErrorOnSecondItem(t *testing.T) {
-	t.Parallel()
-	writeErr := errors.New("second write failed")
-	writer := &conditionalMockWriter{failOnCall: 2, err: writeErr}
+	done := make(chan error, 1)
+	go func() {
+		done <- TrackClipboard(t.Context(), &mockWriter{}, ch)
+	}()
 
-	err := trackClosed(t, writer,
-		gclip.Data{Format: gclip.FmtText, Bytes: []byte("first")},
-		gclip.Data{Format: gclip.FmtText, Bytes: []byte("second")},
-	)
-	if !errors.Is(err, writeErr) {
-		t.Fatalf("expected write error on second item, got %v", err)
-	}
-	if writer.callCount != 2 {
-		t.Errorf("expected 2 write calls, got %d", writer.callCount)
-	}
+	close(ch)
+	assertTrackClipboardDone(t, done)
 }
 
 func TestTrackClipboard_ContextCancelDuringItems(t *testing.T) {
 	t.Parallel()
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 
 	ch := make(chan gclip.Data)
 	writer := &mockWriter{}
@@ -220,10 +140,9 @@ func TestTrackClipboard_ContextCancelDuringItems(t *testing.T) {
 		done <- TrackClipboard(ctx, writer, ch)
 	}()
 
-	ch <- gclip.Data{Format: gclip.FmtText, Bytes: []byte("before-cancel")}
+	ch <- text("before-cancel")
 	cancel()
-
-	assertTrackClipboardDone(t, done, "TrackClipboard did not exit after cancel")
+	assertTrackClipboardDone(t, done)
 
 	if len(writer.items) != 1 {
 		t.Errorf("expected 1 item processed before cancel, got %d", len(writer.items))

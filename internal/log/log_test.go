@@ -1,6 +1,7 @@
 package log
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,12 +13,10 @@ import (
 // resetLog restores default package logger state after the test.
 func resetLog(t *testing.T) {
 	t.Helper()
-	t.Cleanup(restoreDefaultLogger)
-}
-
-func restoreDefaultLogger() {
-	_ = defaultLogger.Close()
-	defaultLogger.Configure(false, "")
+	t.Cleanup(func() {
+		_ = defaultLogger.Close()
+		defaultLogger.Configure(false, "")
+	})
 }
 
 func readLog(t *testing.T, path string) string {
@@ -43,53 +42,58 @@ func TestConfigureVerbose(t *testing.T) {
 	}
 }
 
-func TestConfigureLogFile(t *testing.T) {
+func TestConfigure_WritesToFile(t *testing.T) {
+	tests := []struct {
+		name    string
+		verbose bool
+		log     func(path string)
+		want    []string
+	}{
+		{"println", false, func(string) { Println("info-line") }, []string{logPrefix, "info-line"}},
+		{"tee when verbose", true, func(string) { Println("tee-line") }, []string{logPrefix, "tee-line"}},
+		{"package helpers", false, func(string) {
+			Printf("printf-%s\n", "line")
+			Println("println-line")
+		}, []string{logPrefix, "printf-line", "println-line"}},
+		{"same path reused", false, func(path string) {
+			Println("first")
+			Configure(true, path)
+			Println("second")
+		}, []string{"first", "second"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resetLog(t)
+			path := filepath.Join(t.TempDir(), "homie.log")
+			Configure(tt.verbose, path)
+			tt.log(path)
+
+			got := readLog(t, path)
+			for _, want := range tt.want {
+				if !strings.Contains(got, want) {
+					t.Errorf("log = %q, want %q", got, want)
+				}
+			}
+		})
+	}
+}
+
+func TestConfigure_FileMode(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip()
+	}
 	resetLog(t)
 
 	path := filepath.Join(t.TempDir(), "homie.log")
 	Configure(false, path)
-	Println("info-line")
 
-	got := readLog(t, path)
-	if !strings.Contains(got, "D'OH: ") || !strings.Contains(got, "info-line") {
-		t.Fatalf("log file contents = %q, want D'OH: prefix and message", got)
+	fi, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
 	}
-
-	if runtime.GOOS != "windows" {
-		fi, err := os.Stat(path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got := fi.Mode().Perm() & 0o777; got != 0o600 {
-			t.Fatalf("log file mode = %#o, want 0600", got)
-		}
-	}
-}
-
-func TestConfigureSameLogPathReused(t *testing.T) {
-	resetLog(t)
-
-	path := filepath.Join(t.TempDir(), "homie.log")
-	Configure(false, path)
-	Println("first")
-	Configure(true, path)
-	Println("second")
-
-	got := readLog(t, path)
-	if !strings.Contains(got, "first") || !strings.Contains(got, "second") {
-		t.Fatalf("log file = %q, want both first and second", got)
-	}
-}
-
-func TestConfigure_TeeToFile(t *testing.T) {
-	resetLog(t)
-	path := filepath.Join(t.TempDir(), "homie.log")
-
-	Configure(true, path)
-	Println("tee-line")
-
-	if got := readLog(t, path); !strings.Contains(got, "tee-line") {
-		t.Fatalf("expected tee line in file, got %q", got)
+	if got := fi.Mode().Perm(); got != 0o600 {
+		t.Fatalf("log file mode = %#o, want 0600", got)
 	}
 }
 
@@ -190,26 +194,6 @@ func TestClose_PreservesVerbose(t *testing.T) {
 	}
 }
 
-func TestPackageHelpers_Write(t *testing.T) {
-	resetLog(t)
-
-	path := filepath.Join(t.TempDir(), "homie.log")
-	Configure(false, path)
-
-	Printf("printf-%s\n", "line")
-	Println("println-line")
-
-	got := readLog(t, path)
-	for _, want := range []string{"printf-line", "println-line"} {
-		if !strings.Contains(got, want) {
-			t.Fatalf("log = %q, want %q", got, want)
-		}
-	}
-	if !strings.Contains(got, logPrefix) {
-		t.Fatalf("log = %q, want prefix %q", got, logPrefix)
-	}
-}
-
 func TestFatal(t *testing.T) {
 	if os.Getenv("HOMIE_TEST_FATAL") == "1" {
 		path := os.Getenv("HOMIE_TEST_FATAL_LOG")
@@ -225,8 +209,8 @@ func TestFatal(t *testing.T) {
 		"HOMIE_TEST_FATAL_LOG="+path,
 	)
 	err := cmd.Run()
-	ee, ok := err.(*exec.ExitError)
-	if !ok || ee.ExitCode() != 1 {
+	var ee *exec.ExitError
+	if !errors.As(err, &ee) || ee.ExitCode() != 1 {
 		t.Fatalf("Fatal exit = %v, want exit status 1", err)
 	}
 

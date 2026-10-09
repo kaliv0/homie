@@ -47,11 +47,11 @@ homie history
 Opens a preview window of the copied chronology.<br>
 (Running with the <i>--limit \<n></i> flag retrieves only the last <i>n</i> items. Default limit value: 20)<br>
 <br>
-The history window comes with integrated fuzzy_search that checks the loaded records against a desired pattern.<br>
+The history window comes with integrated fuzzy search that checks the loaded records against a desired pattern.<br>
 If nothing is found, <i>homie</i> pulls more (paginated) records from the database.<br>
 <br>
-After selecting an record and closing the window, <i>homie</i> puts the text inside the clipboard (ready the be pasted wherever needed).<br>
-(NB: You can select multiple items by pinning them with the <i>tab</i> key. They will be added to your clipboard buffer as a single string separted by spaces.)<br>
+After selecting a record and closing the window, <i>homie</i> puts the text inside the clipboard (ready to be pasted wherever needed).<br>
+(NB: You can select multiple items by pinning them with the <i>tab</i> key. They will be added to your clipboard buffer as a single string separated by spaces.)<br>
 To paste the text directly in your terminal run the `history` command with <i>--paste</i>.<br>
 
 ```shell
@@ -112,3 +112,9 @@ Currently <i>homie</i> supports Linux (with X11 or Wayland) and macOS. Shell key
 <p align="center">
   <img src="https://github.com/kaliv0/homie/blob/main/assets/doh.gif?raw=true" width="300" alt="D'OH">
 </p>
+
+---
+
+## Usage of LLMs
+
+<i>Homie</i>'s application code is written by hand. LLMs are used for maintaining the test suite and optimizing certain parts of the code base.

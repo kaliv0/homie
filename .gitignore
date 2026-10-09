@@ -32,3 +32,7 @@ go.work.sum
 # .vscode/
 
 *.log
+
+.cursor/*
+AGENTS.md
+*.ai.md

@@ -111,6 +111,6 @@ func init() {
 	rootCmd.AddCommand(clearHistoryCmd)
 
 	if err := viper.BindPFlag("limit", listHistoryCmd.Flags().Lookup("limit")); err != nil {
-		log.Logger().Fatal(err)
+		log.Fatal(err)
 	}
 }

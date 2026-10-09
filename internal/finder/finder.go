@@ -85,7 +85,7 @@ func handleLoadChannel(s *session, db HistoryReader,
 			loadedOffset = candidateOffset
 			page, err := db.Read(loadedOffset, limit)
 			if err != nil {
-				log.Logger().Printf("failed to load more history items (offset=%d, limit=%d, total=%d): %v\n",
+				log.Printf("failed to load more history items (offset=%d, limit=%d, total=%d): %v\n",
 					loadedOffset, limit, total, err)
 				continue
 			}

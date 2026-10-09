@@ -84,7 +84,7 @@ func Status(cfg *config.Config) (bool, int, error) {
 	}
 	defer func() {
 		if closeErr := f.Close(); closeErr != nil {
-			log.Logger().Println(closeErr)
+			log.Println(closeErr)
 		}
 	}()
 
@@ -130,7 +130,7 @@ func Start(cfg *config.Config, binary string, args ...string) error {
 	}
 	defer func() {
 		if err := cmd.Process.Release(); err != nil {
-			log.Logger().Printf("failed to release daemon process: %v\n", err)
+			log.Printf("failed to release daemon process: %v\n", err)
 		}
 	}()
 	return waitUntilRunning(cfg)

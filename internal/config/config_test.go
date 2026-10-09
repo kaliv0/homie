@@ -26,40 +26,55 @@ func mustDBPath(t *testing.T) string {
 	return path
 }
 
-func TestDBPath_WithXDG(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetDBPath(t, tmpDir)
-
-	path := mustDBPath(t)
-
-	expected := filepath.Join(tmpDir, dbSubdirName, dbFileName)
-	if path != expected {
-		t.Errorf("expected path=%q, got %q", expected, path)
+func TestDBPath(t *testing.T) {
+	tests := []struct {
+		name string
+		// xdg and want take the temp dir as root
+		xdg  func(root string) string
+		want func(root string) string
+	}{
+		{
+			name: "with XDG",
+			xdg:  func(root string) string { return root },
+			want: func(root string) string { return filepath.Join(root, dbSubdirName, dbFileName) },
+		},
+		{
+			name: "XDG with nested path",
+			xdg:  func(root string) string { return filepath.Join(root, "deep", "nested", "config") },
+			want: func(root string) string {
+				return filepath.Join(root, "deep", "nested", "config", dbSubdirName, dbFileName)
+			},
+		},
+		{
+			name: "without XDG falls back to HOME",
+			xdg:  func(string) string { return "" },
+			want: func(root string) string { return filepath.Join(root, dbConfDirName, dbSubdirName, dbFileName) },
+		},
 	}
 
-	dir := filepath.Dir(path)
-	info, err := os.Stat(dir)
-	if err != nil {
-		t.Fatalf("expected directory %q to be created: %v", dir, err)
-	}
-	if !info.IsDir() {
-		t.Errorf("expected %q to be a directory", dir)
-	}
-	if info.Mode().Perm() != dbConfDirPerm {
-		t.Errorf("expected permissions %o, got %o", dbConfDirPerm, info.Mode().Perm())
-	}
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			root := t.TempDir()
+			t.Setenv("HOME", root)
+			resetDBPath(t, tt.xdg(root))
 
-func TestDBPath_WithoutXDG(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetDBPath(t, "")
-	t.Setenv("HOME", tmpDir)
+			path := mustDBPath(t)
+			if want := tt.want(root); path != want {
+				t.Errorf("expected path=%q, got %q", want, path)
+			}
 
-	path := mustDBPath(t)
-
-	expected := filepath.Join(tmpDir, dbConfDirName, dbSubdirName, dbFileName)
-	if path != expected {
-		t.Errorf("expected path=%q, got %q", expected, path)
+			dir := filepath.Dir(path)
+			info, err := os.Stat(dir)
+			if err != nil {
+				t.Fatalf("expected directory %q to be created: %v", dir, err)
+			}
+			if !info.IsDir() {
+				t.Errorf("expected %q to be a directory", dir)
+			}
+			if info.Mode().Perm() != dbConfDirPerm {
+				t.Errorf("expected permissions %o, got %o", dbConfDirPerm, info.Mode().Perm())
+			}
+		})
 	}
 }
 
@@ -71,21 +86,5 @@ func TestDBPath_Idempotent(t *testing.T) {
 
 	if path1 != path2 {
 		t.Errorf("DBPath() not idempotent: %q != %q", path1, path2)
-	}
-}
-
-func TestDBPath_XDGWithNestedPath(t *testing.T) {
-	tmpDir := t.TempDir()
-	nestedDir := filepath.Join(tmpDir, "deep", "nested", "config")
-	resetDBPath(t, nestedDir)
-
-	path := mustDBPath(t)
-
-	expected := filepath.Join(nestedDir, dbSubdirName, dbFileName)
-	if path != expected {
-		t.Errorf("expected path=%q, got %q", expected, path)
-	}
-	if _, err := os.Stat(filepath.Dir(path)); err != nil {
-		t.Fatalf("nested directory not created: %v", err)
 	}
 }

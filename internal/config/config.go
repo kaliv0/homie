@@ -46,13 +46,7 @@ const (
 var ReadConfig = sync.OnceValue(readConfig)
 
 func readConfig() error {
-	viper.SetDefault(Verbose, false)
-	viper.SetDefault(LogFile, "")
-	viper.SetDefault(PIDFile, "")
-	viper.SetDefault(TTL, DefaultTTL)
-	viper.SetDefault(Limit, DefaultLimit)
-	viper.SetDefault(Keep, DefaultKeep)
-	viper.SetDefault(Threshold, DefaultThreshold)
+	setDefaults(viper.GetViper())
 
 	viper.SetConfigName(confFileName)
 	viper.SetConfigType(confFileType)
@@ -63,6 +57,17 @@ func readConfig() error {
 		}
 	}
 	return nil
+}
+
+// setDefaults registers default values for all ~/.homierc keys.
+func setDefaults(v *viper.Viper) {
+	v.SetDefault(Verbose, false)
+	v.SetDefault(LogFile, "")
+	v.SetDefault(PIDFile, "")
+	v.SetDefault(TTL, DefaultTTL)
+	v.SetDefault(Limit, DefaultLimit)
+	v.SetDefault(Keep, DefaultKeep)
+	v.SetDefault(Threshold, DefaultThreshold)
 }
 
 var (

@@ -2,31 +2,21 @@ package config
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/spf13/viper"
 )
 
-func applyHomieDefaults(v *viper.Viper) {
-	v.SetDefault(Verbose, false)
-	v.SetDefault(LogFile, "")
-	v.SetDefault(PIDFile, "")
-	v.SetDefault(Limit, DefaultLimit)
-	v.SetDefault(TTL, DefaultTTL)
-	v.SetDefault(Keep, DefaultKeep)
-	v.SetDefault(Threshold, DefaultThreshold)
-}
-
 func viperFromYAML(t *testing.T, yaml string) *viper.Viper {
 	t.Helper()
 	v := viper.New()
-	applyHomieDefaults(v)
+	setDefaults(v)
 	if yaml == "" {
 		return v
 	}
@@ -205,10 +195,7 @@ func TestParse(t *testing.T) {
 	}
 
 	t.Run("expands log file path", func(t *testing.T) {
-		v := viper.New()
-		applyHomieDefaults(v)
-		v.Set(LogFile, "~/homie.log")
-		cfg := Parse(v)
+		cfg := Parse(viperFromYAML(t, "log_file: ~/homie.log\n"))
 		want := filepath.Join(tmpDir, "homie.log")
 		if cfg.LogFile != want {
 			t.Errorf("LogFile = %q, want %q", cfg.LogFile, want)
@@ -241,7 +228,7 @@ func TestResolvePIDFileDefault_fallbacks(t *testing.T) {
 			t.Skip("linux-only fallback")
 		}
 		cfg := Parse(viperFromYAML(t, ""))
-		want := filepath.Join(runDir, fmt.Sprintf("%d", os.Getuid()), pidFileName)
+		want := filepath.Join(runDir, strconv.Itoa(os.Getuid()), pidFileName)
 		if cfg.PIDFile != want {
 			t.Fatalf("PIDFile = %q, want %q", cfg.PIDFile, want)
 		}

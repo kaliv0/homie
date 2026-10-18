@@ -117,4 +117,4 @@ Currently <i>homie</i> supports Linux (with X11 or Wayland) and macOS. Shell key
 
 ## Usage of LLMs
 
-<i>Homie</i>'s application code is written by hand. LLMs are used for maintaining the test suite and optimizing certain parts of the code base.
+<i>Homie</i>'s application code is written by hand. LLMs are used to maintain the test suite and optimize certain parts of the code base.

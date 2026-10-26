@@ -49,7 +49,7 @@ func init() {
 	rootCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
 		if cmd == rootCmd {
 			// print Banner only for 'homie -h'
-			fmt.Fprintln(cmd.OutOrStdout(), ascii.Banner)
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), ascii.Banner)
 		}
 		help(cmd, args)
 	})

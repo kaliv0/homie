@@ -13,3 +13,12 @@ var Wonder string
 
 //go:embed thumbsup
 var Thumbsup string
+
+//go:embed run
+var Run string
+
+//go:embed icecream
+var Icecream string
+
+//go:embed donut
+var Donut string

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/kaliv0/homie/assets/ascii"
 	"github.com/spf13/cobra"
 )
 
@@ -45,5 +46,6 @@ Then reload your shell.`,
 )
 
 func init() {
+	completionCmd.SetHelpTemplate(ascii.Icecream + "\n" + completionCmd.HelpTemplate())
 	rootCmd.AddCommand(completionCmd)
 }

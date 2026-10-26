@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"os"
 
+	"github.com/kaliv0/homie/assets/ascii"
 	"github.com/spf13/cobra"
 )
 
@@ -29,5 +30,6 @@ Requires tmux 3.2+ (for display-popup)`,
 }
 
 func init() {
+	generateTmuxConfigCmd.SetHelpTemplate(ascii.Icecream + "\n" + generateTmuxConfigCmd.HelpTemplate())
 	rootCmd.AddCommand(generateTmuxConfigCmd)
 }

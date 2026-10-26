@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/kaliv0/homie/assets/ascii"
 	"github.com/spf13/cobra"
 )
 
@@ -67,5 +68,6 @@ func resolveShell(name string) (string, error) {
 }
 
 func init() {
+	generateShellConfigCmd.SetHelpTemplate(ascii.Icecream + "\n" + generateShellConfigCmd.HelpTemplate())
 	rootCmd.AddCommand(generateShellConfigCmd)
 }

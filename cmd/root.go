@@ -17,7 +17,7 @@ var cfg *config.Config
 var rootCmd = &cobra.Command{
 	Use:           "homie",
 	Short:         "Terminal-based clipboard manager",
-	Version:       "1.16.1",
+	Version:       "1.16.2",
 	SilenceErrors: true,
 	SilenceUsage:  true,
 	PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {

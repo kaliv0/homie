@@ -152,6 +152,8 @@ func runProcess(cfg *config.Config) error {
 }
 
 func init() {
+	startDaemonCmd.SetHelpTemplate(ascii.Run + "\n" + startDaemonCmd.HelpTemplate())
+	restartDaemonCmd.SetHelpTemplate(ascii.Run + "\n" + restartDaemonCmd.HelpTemplate())
 	stopCmd.SetHelpTemplate(ascii.Axe + "\n" + stopCmd.HelpTemplate())
 	statusCmd.SetHelpTemplate(ascii.Wonder + "\n" + statusCmd.HelpTemplate())
 

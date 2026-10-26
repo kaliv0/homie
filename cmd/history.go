@@ -108,6 +108,7 @@ func init() {
 		"Paste selected history item",
 	)
 
+	listHistoryCmd.SetHelpTemplate(ascii.Donut + "\n" + listHistoryCmd.HelpTemplate())
 	clearHistoryCmd.SetHelpTemplate(ascii.Thumbsup + "\n" + clearHistoryCmd.HelpTemplate())
 
 	rootCmd.AddCommand(listHistoryCmd)

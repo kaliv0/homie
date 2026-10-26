@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"github.com/kaliv0/homie/assets/ascii"
 	"github.com/kaliv0/homie/internal/clipboard"
 	"github.com/kaliv0/homie/internal/config"
 	"github.com/kaliv0/homie/internal/finder"
@@ -106,6 +107,8 @@ func init() {
 		false,
 		"Paste selected history item",
 	)
+
+	clearHistoryCmd.SetHelpTemplate(ascii.Thumbsup + "\n" + clearHistoryCmd.HelpTemplate())
 
 	rootCmd.AddCommand(listHistoryCmd)
 	rootCmd.AddCommand(clearHistoryCmd)

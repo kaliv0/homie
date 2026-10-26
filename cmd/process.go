@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	gclip "golang.design/x/clipboard"
 
+	"github.com/kaliv0/homie/assets/ascii"
 	"github.com/kaliv0/homie/internal/clipboard"
 	"github.com/kaliv0/homie/internal/config"
 	"github.com/kaliv0/homie/internal/daemon"
@@ -151,6 +152,9 @@ func runProcess(cfg *config.Config) error {
 }
 
 func init() {
+	stopCmd.SetHelpTemplate(ascii.Axe + "\n" + stopCmd.HelpTemplate())
+	statusCmd.SetHelpTemplate(ascii.Wonder + "\n" + statusCmd.HelpTemplate())
+
 	rootCmd.AddCommand(startDaemonCmd)
 	rootCmd.AddCommand(restartDaemonCmd)
 	rootCmd.AddCommand(runCmd)
